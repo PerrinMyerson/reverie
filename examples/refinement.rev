@@ -1,0 +1,5 @@
+// Runtime-checked refinement predicates on reversible locals.
+
+local n: int where n >= 0 = 3
+  n -= 1
+delocal n = 2

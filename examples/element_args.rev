@@ -1,0 +1,8 @@
+// Constant indexed cells can be passed as by-reference procedure arguments
+// when the checker can prove they are distinct.
+
+proc bump(x, y) {
+  x += y
+}
+
+call bump(xs[0], xs[1])

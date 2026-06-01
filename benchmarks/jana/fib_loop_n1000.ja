@@ -1,0 +1,27 @@
+/*
+ * Jana/Janus baseline for the Reverie Fibonacci pair-transform benchmark.
+ *
+ * Run with Jana's 64-bit modular arithmetic mode:
+ *
+ *   janus -m64 benchmarks/jana/fib_loop_n1000.ja
+ */
+
+procedure main()
+    int n = 1000
+    int i = 0
+    int a = 0
+    int b = 1
+
+    if n != 0 then
+        from i = 0 do
+            a += b
+            a <=> b
+            i += 1
+        loop
+            skip
+        until i = n
+    else
+        skip
+    fi n != 0
+
+    printf("%d %d %d %d\n", n, i, a, b)

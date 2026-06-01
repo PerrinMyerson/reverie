@@ -1,0 +1,26 @@
+/*
+ * Jana/Janus baseline for reversing the procedure-heavy call/uncall loop.
+ */
+
+procedure bump(int x, int y)
+    x += y
+
+procedure main()
+    int n = 1000
+    int i = 1000
+    int x = 0
+    int y = 1
+
+    if n != 0 then
+        from i = n do
+            i -= 1
+            call bump(x, y)
+            uncall bump(x, y)
+        loop
+            skip
+        until i = 0
+    else
+        skip
+    fi n != 0
+
+    printf("%d %d %d %d\n", n, i, x, y)

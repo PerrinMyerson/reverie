@@ -1,0 +1,23 @@
+// Janus-style operator aliases.
+//
+// Reverie keeps its canonical operators, but accepts common Janus spellings:
+// `=` equality, `#` not-equals, `~` logical not, bitwise/boolean `&` and `|`,
+// `<<`/`>>` shifts, `*/` fixed-point multiply, `\` remainder, infix `!` xor,
+// `!=` xor-update, and `:` swap.
+
+local x: int = 5
+  local y: int = 3
+    local z: int = 0
+      z += x \ y;
+      z += x ! y;
+      assert z = 8;
+      assert (x # y) & ~(x < y) | false;
+      x != y;
+      x : y;
+      x : y;
+      x != y;
+      z -= x \ y;
+      z -= x ! y
+    delocal z = 0
+  delocal y = 3
+delocal x = 5

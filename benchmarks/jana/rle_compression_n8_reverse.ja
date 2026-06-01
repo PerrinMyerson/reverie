@@ -1,0 +1,27 @@
+/*
+ * Reverse fixture for Reverie's reversible run-length compression example.
+ */
+
+procedure rle(int n, int run, int data[], int symbols[], int counts[])
+    symbols[0] += data[0]
+    counts[0] += 1
+    run += 1
+
+    iterate int i = 1 to n - 1
+        if data[i] != data[i - 1] then
+            symbols[run] += data[i]
+            counts[run] += 1
+            run += 1
+        else
+            counts[run - 1] += 1
+        fi data[i] != data[i - 1]
+    end
+
+procedure main()
+    int n = 8
+    int run = 3
+    int data[8] = {2, 2, 2, 5, 5, 1, 1, 1}
+    int symbols[8] = {2, 5, 1, 0, 0, 0, 0, 0}
+    int counts[8] = {3, 2, 3, 0, 0, 0, 0, 0}
+
+    uncall rle(n, run, data, symbols, counts)

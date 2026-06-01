@@ -1,0 +1,22 @@
+// Table-driven bit-reversal permutation.
+//
+// For eight elements, `perm` maps each index to its three-bit reversal:
+// 0->0, 1->4, 2->2, 3->6, 4->1, 5->5, 6->3, 7->7.
+// Swapping only when `i < perm[i]` applies each transposition exactly once.
+// Seed with:
+//
+//   --var n=8
+//   --var 'xs=[10,20,30,40,50,60,70,80]'
+//   --var 'perm=[0,4,2,6,1,5,3,7]'
+
+proc bitrev(n, xs, perm) {
+  iterate int i = 0 to n - 1
+    if i < perm[i] then
+      xs[i] <=> xs[perm[i]]
+    else
+      skip
+    fi i < perm[i]
+  end
+}
+
+call bitrev(n, xs, perm)

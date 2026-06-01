@@ -1,0 +1,6 @@
+// Standalone assertions are reversible because they do not mutate the store.
+
+assert_eq(x, 0);
+assert_eq(target, 2);
+assert_ne(target, x);
+assert !(x != 0)

@@ -1,0 +1,23 @@
+[package]
+name = "reverie-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "reverie"
+path = "src/main.rs"
+
+[dependencies]
+ariadne.workspace = true
+clap.workspace = true
+reverie-core.workspace = true
+reverie-interp.workspace = true
+reverie-syntax.workspace = true
+reverie-tui.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+predicates.workspace = true

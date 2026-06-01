@@ -1,0 +1,4 @@
+local xs: array<int<m>> = [1<m>, 2<m>]
+  xs[0] += 1<m>;
+  xs[0] -= 1<m>
+delocal xs = [1<m>, 2<m>]

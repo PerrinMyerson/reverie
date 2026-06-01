@@ -1,0 +1,23 @@
+/*
+ * Reverse fixture for Jana's permutation-to-code example.
+ */
+
+procedure perm_to_code(int x[])
+    local int k = size(x)
+    from k = size(x) loop
+        k -= 1
+        local int j = 0
+        from j = 0 loop
+            if x[j] > x[k] then
+                x[j] -= 1
+            fi x[j] >= x[k]
+            j += 1
+        until j = k
+        delocal int j = k
+    until k = 0
+    delocal int k = 0
+
+procedure main()
+    int x[6] = {0, 0, 2, 1, 4, 4}
+
+    uncall perm_to_code(x)

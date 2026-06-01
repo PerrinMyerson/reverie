@@ -1,0 +1,5 @@
+// Negative runtime example: the delocal destruction assertion lies.
+
+local x: int = 0
+  x += 1
+delocal x = 2

@@ -1,0 +1,11 @@
+if n != 0 then
+  from i == 0 do
+    a += b;
+    a <=> b;
+    i += 1
+  loop
+    skip
+  until i == n
+else
+  skip
+fi n != 0

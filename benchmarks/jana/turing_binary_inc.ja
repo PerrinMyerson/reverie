@@ -1,0 +1,144 @@
+/*
+ * Jana/Janus baseline for Reverie's strict Turing-machine example.
+ *
+ * This is a modern-Jana fixture adapted from Jana's legacy
+ * basicExamples/turing.janus. The original guarded-rule idiom is made
+ * explicit so the selected rule satisfies the reversible if assertion.
+ *
+ * Run with:
+ *
+ *   janus -m64 benchmarks/jana/turing_binary_inc.ja
+ */
+
+procedure turing(
+    int q, int s, int leftstk[], int leftsp, int rightstk[], int rightsp,
+    int q1[], int s1[], int s2[], int q2[], int PC_MAX, int pc,
+    int QS, int QF, int slash, int right, int left, int blank
+)
+    from q = QS
+    do
+        call inst(
+            q, s, leftstk, leftsp, rightstk, rightsp,
+            q1, s1, s2, q2, pc, slash, right, left, blank
+        )
+        pc += 1
+        if pc = PC_MAX then
+            pc ^= PC_MAX
+        fi pc = 0
+    until q = QF
+
+procedure inst(
+    int q, int s, int leftstk[], int leftsp, int rightstk[], int rightsp,
+    int q1[], int s1[], int s2[], int q2[], int pc,
+    int slash, int right, int left, int blank
+)
+    if (q = q1[pc]) && ((s = s1[pc]) || (s1[pc] = slash)) then
+        if s = s1[pc] then
+            q += q2[pc] - q1[pc]
+            s += s2[pc] - s1[pc]
+        else
+            if s1[pc] = slash then
+                q += q2[pc] - q1[pc]
+                if s2[pc] = right then
+                    call pushleft(s, leftstk, leftsp, blank)
+                    uncall pushright(s, rightstk, rightsp, blank)
+                else
+                    if s2[pc] = left then
+                        call pushright(s, rightstk, rightsp, blank)
+                        uncall pushleft(s, leftstk, leftsp, blank)
+                    fi s2[pc] = left
+                fi s2[pc] = right
+            fi s1[pc] = slash
+        fi s = s2[pc]
+    fi q = q2[pc]
+
+procedure pushleft(int s, int leftstk[], int leftsp, int blank)
+    if (leftsp = 0) && (s = blank) then
+        s ^= blank
+    else
+        leftstk[leftsp] ^= s
+        leftsp += 1
+    fi leftsp = 0
+
+procedure pushright(int s, int rightstk[], int rightsp, int blank)
+    if (rightsp = 0) && (s = blank) then
+        s ^= blank
+    else
+        rightstk[rightsp] ^= s
+        rightsp += 1
+    fi rightsp = 0
+
+procedure init(int left, int slash, int right, int blank)
+    left ^= 100
+    slash ^= 101
+    right ^= 102
+    blank ^= 200
+
+procedure binaryInc(
+    int q, int q1[], int s1[], int s2[], int q2[], int PC_MAX,
+    int QS, int QF, int slash, int right, int left, int blank
+)
+    PC_MAX ^= 8
+    q ^= 1
+    QS ^= 1
+    QF ^= 6
+    q1[0] ^= 1
+    s1[0] ^= blank
+    s2[0] ^= blank
+    q2[0] ^= 2
+    q1[1] ^= 2
+    s1[1] ^= slash
+    s2[1] ^= right
+    q2[1] ^= 3
+    q1[2] ^= 3
+    s1[2] ^= 0
+    s2[2] ^= 1
+    q2[2] ^= 4
+    q1[3] ^= 3
+    s1[3] ^= 1
+    s2[3] ^= 0
+    q2[3] ^= 2
+    q1[4] ^= 3
+    s1[4] ^= blank
+    s2[4] ^= blank
+    q2[4] ^= 4
+    q1[5] ^= 4
+    s1[5] ^= slash
+    s2[5] ^= left
+    q2[5] ^= 5
+    q1[6] ^= 5
+    s1[6] ^= 0
+    s2[6] ^= 0
+    q2[6] ^= 4
+    q1[7] ^= 5
+    s1[7] ^= blank
+    s2[7] ^= blank
+    q2[7] ^= 6
+
+procedure main()
+    int q
+    int s
+    int leftstk[4]
+    int leftsp
+    int rightstk[4]
+    int rightsp
+    int q1[8]
+    int s1[8]
+    int s2[8]
+    int q2[8]
+    int PC_MAX
+    int pc
+    int QS
+    int QF
+    int slash
+    int right
+    int left
+    int blank
+
+    call init(left, slash, right, blank)
+    call binaryInc(q, q1, s1, s2, q2, PC_MAX, QS, QF, slash, right, left, blank)
+    s ^= blank
+    call turing(
+        q, s, leftstk, leftsp, rightstk, rightsp,
+        q1, s1, s2, q2, PC_MAX, pc, QS, QF, slash, right, left, blank
+    )

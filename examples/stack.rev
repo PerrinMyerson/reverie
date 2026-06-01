@@ -1,0 +1,21 @@
+// Janus-style reversible integer stack operations.
+//
+// `push(x, s)` moves `x` onto stack `s` and clears `x`.
+// `pop(x, s)` requires `x == 0`, restores the stack top into `x`, and removes
+// it from `s`.
+
+local s: stack = nil
+  local x: int = 0
+    x += 1;
+    push(x, s);
+    x += 2;
+    push(x, s);
+    assert !is_empty(s);
+    assert peek(s) == 2;
+    assert size(s) == 2;
+    pop(x, s);
+    x -= 2;
+    pop(x, s);
+    x -= 1
+  delocal x = 0
+delocal s = nil

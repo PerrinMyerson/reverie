@@ -1,0 +1,26 @@
+/*
+ * Jana/Janus baseline for the reverse Fibonacci pair-transform benchmark.
+ *
+ * This starts from the known final state of fib_loop_n1000.ja and runs the
+ * inverted loop body back to the initial state.
+ */
+
+procedure main()
+    int n = 1000
+    int i = 1000
+    int a = 817770325994397771
+    int b = 9079565065540428013
+
+    if n != 0 then
+        from i = n do
+            i -= 1
+            a <=> b
+            a -= b
+        loop
+            skip
+        until i = 0
+    else
+        skip
+    fi n != 0
+
+    printf("%d %d %d %d\n", n, i, a, b)

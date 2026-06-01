@@ -1,0 +1,8 @@
+local distance: int<m> = 100<m>
+  local time: int<s> = 10<s>
+    local speed: int<m/s> = 0<m/s>
+      speed += distance / time;
+      speed -= 10<m/s>
+    delocal speed = 0<m/s>
+  delocal time = 10<s>
+delocal distance = 100<m>

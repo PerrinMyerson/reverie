@@ -1,0 +1,13 @@
+// Fixed-size array example.
+//
+// Run forward with:
+//   reverie run examples/array.rev --var 'xs=[10,20,30]' --var delta=5
+//
+// The program updates one element, uses a sized type-first local array, and
+// swaps two elements. The top-level operations are reversible because the update
+// expression does not mention `xs`, and the swap indices are constants.
+xs[1] += delta;
+local int scratch[3] = [1, 2, 3]
+  scratch[1] += delta
+delocal int scratch[3] = [1, 7, 3];
+swap(xs[0], xs[2])

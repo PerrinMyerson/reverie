@@ -1,0 +1,3 @@
+local x: int = 1
+  assert -x == -1
+delocal x = 1

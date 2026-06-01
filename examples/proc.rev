@@ -1,0 +1,9 @@
+// By-reference procedure call with a reversible local witness.
+
+proc bump(x) {
+  local t: int = x
+    x += 1
+  delocal t = x - 1
+}
+
+call bump(n)

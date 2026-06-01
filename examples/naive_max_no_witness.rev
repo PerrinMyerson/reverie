@@ -1,0 +1,9 @@
+// Negative runtime example: compare-swap needs a witness bit.
+//
+// When the input is already sorted, the false branch preserves `x > y`, but
+// the trailing assertion falsely claims the false branch should end with
+// `x > y` false.
+
+if x < y then
+  x <=> y
+fi x > y

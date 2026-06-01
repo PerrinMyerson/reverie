@@ -1,0 +1,527 @@
+{
+  "examples": [
+    {
+      "jana": {
+        "exit_code": 1,
+        "message": "File \"/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline/basicExamples/automata.janus\" in line 3, column 1:",
+        "status": "failed",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "path": "basicExamples/automata.janus",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{cell = [0, 100, 100], cells = 3, i = 0, j = 0, l = 0, map = [0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 100, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 101, 0, 0, 0, 0, 0, 0, 0, 0, 110, 111], n = 0, r = 0, rmap = [0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 1, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 101, 0, 0, 0, 0, 0, 0, 0, 0, 110, 111], steps = 1, t1 = 0, t2 = 0}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{cell = [0, 100, 100], cells = 3, i = 0, j = 0, l = 0, map = [0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 100, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 101, 0, 0, 0, 0, 0, 0, 0, 0, 110, 111], n = 0, r = 0, rmap = [0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 1, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 101, 0, 0, 0, 0, 0, 0, 0, 0, 110, 111], steps = 1, t1 = 0, t2 = 0}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 1,
+        "message": "File \"/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline/basicExamples/factor.janus\" in line 11, column 1:",
+        "status": "failed",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "path": "basicExamples/factor.janus",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{fact = [0, 2, 2, 2, 3, 5, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], i = 0, num = 0, try = 0, z = 0}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{fact = [0, 2, 2, 2, 3, 5, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], i = 0, num = 0, try = 0, z = 0}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 1,
+        "message": "File \"/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline/basicExamples/fib.janus\" in line 10, column 1:",
+        "status": "failed",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "path": "basicExamples/fib.janus",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{n = 0, x1 = 5, x2 = 8}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{n = 0, x1 = 5, x2 = 8}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 1,
+        "message": "File \"/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline/basicExamples/perm_to_code.janus\" in line 4, column 1:",
+        "status": "failed",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "path": "basicExamples/perm_to_code.janus",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{j = 0, k = 0, x = [0, 0, 2, 1, 4, 4]}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{j = 0, k = 0, x = [0, 0, 2, 1, 4, 4]}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 1,
+        "message": "File \"/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline/basicExamples/root.janus\" in line 11, column 1:",
+        "status": "failed",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "path": "basicExamples/root.janus",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{bit = 0, num = 0, root = 10, z = 0}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{bit = 0, num = 0, root = 10, z = 0}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 1,
+        "message": "File \"/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline/basicExamples/runlength_encoding.janus\" in line 3, column 1:",
+        "status": "failed",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "path": "basicExamples/runlength_encoding.janus",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{arc = [1, 2, 2, 3, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0], i = 0, j = 0, text = [0, 0, 0, 0, 0, 0, 0]}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{arc = [1, 2, 2, 3, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0], i = 0, j = 0, text = [0, 0, 0, 0, 0, 0, 0]}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 1,
+        "message": "File \"/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline/basicExamples/schroedinger.janus\" in line 6, column 1:",
+        "status": "failed",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "path": "basicExamples/schroedinger.janus",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{alphas = [458243442, 456664951, 455111319, 453582544, 452078627, 450599569, 449145369, 447716027, 446311542, 444931917, 443577149, 442247239, 440942188, 439661994, 438406659, 437176182, 435970563, 434789802, 433633899, 432502854, 431396668, 430315339, 429258869, 428227257, 427220503, 426238607, 425281569, 424349389, 423442068, 422559605, 421701999, 420869252, 420061363, 419278332, 418520159, 417786845, 417078388, 416394790, 415736049, 415102167, 414493143, 413908977, 413349669, 412815220, 412305628, 411820895, 411361019, 410926002, 410515843, 410130542, 409770099, 409434515, 409123788, 408837920, 408576909, 408340757, 408129463, 407943027, 407781450, 407644730, 407532868, 407445865, 407383720, 407346432, 407334003, 407346432, 407383720, 407445865, 407532868, 407644730, 407781450, 407943027, 408129463, 408340757, 408576909, 408837920, 409123788, 409434515, 409770099, 410130542, 410515843, 410926002, 411361019, 411820895, 412305628, 412815220, 413349669, 413908977, 414493143, 415102167, 415736049, 416394790, 417078388, 417786845, 418520159, 419278332, 420061363, 420869252, 421701999, 422559605, 423442068, 424349389, 425281569, 426238607, 427220503, 428227257, 429258869, 430315339, 431396668, 432502854, 433633899, 434789802, 435970563, 437176182, 438406659, 439661994, 440942188, 442247239, 443577149, 444931917, 446311542, 447716027, 449145369, 450599569, 452078627, 453582544, 455111319, 456664951], epsilon = 203667001, i = 0, j = 0, psiI = [165278, -59764, -168322, -266783, -325458, -350804, -335418, -435298, -538288, -685575, -884635, -876379, -781564, -321552, 371536, 1533869, 2922631, 4849008, 7045913, 9575829, 12249333, 14733614, 16509424, 17350741, 16266532, 13119258, 7165511, -2175252, -14959368, -31512327, -51354214, -73359142, -96159973, -117481416, -134748495, -145119829, -145621280, -133184954, -105653756, -61754681, -1343948, 73355922, 159045327, 250471558, 340617018, 421558241, 484672227, 521623762, 525263689, 491156271, 416761634, 303477052, 156259510, -16333804, -202750043, -388949764, -560406174, -703001553, -803847820, -853280930, -846345419, -782532674, -666082425, -505927571, -315005836, -108402062, 97407482, 286596587, 445592105, 563971953, 634915333, 656424802, 631298813, 565690890, 468477330, 350821545, 224317135, 100009402, -12600279, -106135949, -176502468, -221535700, -241777306, -240106229, -220726996, -188673233, -149163448, -107163358, -66306063, -30210432, -710538, 21208972, 35421785, 42762822, 44492462, 41847567, 36278897, 29182610, 21622918, 14464687, 8549287, 3719219, 306116, -1923677, -3361878, -3849529, -3881222, -3530106, -2924163, -2331501, -1818201, -1290309, -978341, -574209, -328092, -25219, 58503, 200226, 90702, 56518, -39288, -55536, -30515, 114889, 178886, 293380, 328708, 199203], psiR = [-131911, -344481, -190862, -276255, -218225, -290430, -129544, -191424, 131194, 374060, 800211, 1435650, 1992445, 2641512, 3289916, 3644549, 4030825, 3998577, 3503908, 2426497, 251018, -3132998, -7804236, -14059806, -21354083, -29622738, -38133844, -46197971, -52581618, -56188836, -55252578, -48390029, -34377581, -12216592, 18355023, 56634587, 101763586, 150806756, 200541521, 246293838, 282858776, 304702111, 306984743, 285221912, 236556182, 160319586, 58099409, -65653710, -203300506, -345781887, -481817056, -599601889, -687274554, -735155685, -735455659, -684851225, -584066663, -437874798, -255381728, -49773746, 163241451, 367952166, 548333697, 690398864, 783183002, 821188059, 802901769, 731682506, 615190545, 465444786, 296128258, 121250696, -45145338, -190776275, -306288186, -386484348, -428852209, -435192180, -409650561, -358867733, -290533043, -213351993, -134795785, -61320521, 1884058, 51722828, 86762672, 106934996, 113970169, 110239350, 98575066, 81689368, 62609286, 43168997, 25533607, 10832862, -512013, -8275248, -12833334, -14857444, -14701795, -13191004, -10799685, -8185535, -5558031, -3509890, -1757546, -530439, 282033, 886298, 1170441, 1135412, 1107613, 692362, 410964, 120147, -182274, -256138, -311948, -401406, -263934, -383387, -291502, -328286, -290609, -349191, -187799, -392201]}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{alphas = [458243442, 456664951, 455111319, 453582544, 452078627, 450599569, 449145369, 447716027, 446311542, 444931917, 443577149, 442247239, 440942188, 439661994, 438406659, 437176182, 435970563, 434789802, 433633899, 432502854, 431396668, 430315339, 429258869, 428227257, 427220503, 426238607, 425281569, 424349389, 423442068, 422559605, 421701999, 420869252, 420061363, 419278332, 418520159, 417786845, 417078388, 416394790, 415736049, 415102167, 414493143, 413908977, 413349669, 412815220, 412305628, 411820895, 411361019, 410926002, 410515843, 410130542, 409770099, 409434515, 409123788, 408837920, 408576909, 408340757, 408129463, 407943027, 407781450, 407644730, 407532868, 407445865, 407383720, 407346432, 407334003, 407346432, 407383720, 407445865, 407532868, 407644730, 407781450, 407943027, 408129463, 408340757, 408576909, 408837920, 409123788, 409434515, 409770099, 410130542, 410515843, 410926002, 411361019, 411820895, 412305628, 412815220, 413349669, 413908977, 414493143, 415102167, 415736049, 416394790, 417078388, 417786845, 418520159, 419278332, 420061363, 420869252, 421701999, 422559605, 423442068, 424349389, 425281569, 426238607, 427220503, 428227257, 429258869, 430315339, 431396668, 432502854, 433633899, 434789802, 435970563, 437176182, 438406659, 439661994, 440942188, 442247239, 443577149, 444931917, 446311542, 447716027, 449145369, 450599569, 452078627, 453582544, 455111319, 456664951], epsilon = 203667001, i = 0, j = 0, psii = [165278, -59764, -168322, -266783, -325458, -350804, -335418, -435298, -538288, -685575, -884635, -876379, -781564, -321552, 371536, 1533869, 2922631, 4849008, 7045913, 9575829, 12249333, 14733614, 16509424, 17350741, 16266532, 13119258, 7165511, -2175252, -14959368, -31512327, -51354214, -73359142, -96159973, -117481416, -134748495, -145119829, -145621280, -133184954, -105653756, -61754681, -1343948, 73355922, 159045327, 250471558, 340617018, 421558241, 484672227, 521623762, 525263689, 491156271, 416761634, 303477052, 156259510, -16333804, -202750043, -388949764, -560406174, -703001553, -803847820, -853280930, -846345419, -782532674, -666082425, -505927571, -315005836, -108402062, 97407482, 286596587, 445592105, 563971953, 634915333, 656424802, 631298813, 565690890, 468477330, 350821545, 224317135, 100009402, -12600279, -106135949, -176502468, -221535700, -241777306, -240106229, -220726996, -188673233, -149163448, -107163358, -66306063, -30210432, -710538, 21208972, 35421785, 42762822, 44492462, 41847567, 36278897, 29182610, 21622918, 14464687, 8549287, 3719219, 306116, -1923677, -3361878, -3849529, -3881222, -3530106, -2924163, -2331501, -1818201, -1290309, -978341, -574209, -328092, -25219, 58503, 200226, 90702, 56518, -39288, -55536, -30515, 114889, 178886, 293380, 328708, 199203], psir = [-131911, -344481, -190862, -276255, -218225, -290430, -129544, -191424, 131194, 374060, 800211, 1435650, 1992445, 2641512, 3289916, 3644549, 4030825, 3998577, 3503908, 2426497, 251018, -3132998, -7804236, -14059806, -21354083, -29622738, -38133844, -46197971, -52581618, -56188836, -55252578, -48390029, -34377581, -12216592, 18355023, 56634587, 101763586, 150806756, 200541521, 246293838, 282858776, 304702111, 306984743, 285221912, 236556182, 160319586, 58099409, -65653710, -203300506, -345781887, -481817056, -599601889, -687274554, -735155685, -735455659, -684851225, -584066663, -437874798, -255381728, -49773746, 163241451, 367952166, 548333697, 690398864, 783183002, 821188059, 802901769, 731682506, 615190545, 465444786, 296128258, 121250696, -45145338, -190776275, -306288186, -386484348, -428852209, -435192180, -409650561, -358867733, -290533043, -213351993, -134795785, -61320521, 1884058, 51722828, 86762672, 106934996, 113970169, 110239350, 98575066, 81689368, 62609286, 43168997, 25533607, 10832862, -512013, -8275248, -12833334, -14857444, -14701795, -13191004, -10799685, -8185535, -5558031, -3509890, -1757546, -530439, 282033, 886298, 1170441, 1135412, 1107613, 692362, 410964, 120147, -182274, -256138, -311948, -401406, -263934, -383387, -291502, -328286, -290609, -349191, -187799, -392201]}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 1,
+        "message": "File \"/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline/basicExamples/smf.janus\" in line 1, column 1:",
+        "status": "failed",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "path": "basicExamples/smf.janus",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{m1 = 2, m1p = 0, m2 = 3, m2p = 0, mask = 2147483648, out = 0, position = 32, tmp = 0}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{m1 = 2, m1p = 0, m2 = 3, m2p = 0, mask = 2147483648, out = 0, position = 32, tmp = 0}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 1,
+        "message": "File \"/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline/basicExamples/sort.janus\" in line 9, column 1:",
+        "status": "failed",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "path": "basicExamples/sort.janus",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{i = 0, j = 0, list = [0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0], n = 4, perm = [3, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{i = 0, j = 0, list = [0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0], n = 4, perm = [3, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 1,
+        "message": "File \"/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline/basicExamples/swap_equals.janus\" in line 4, column 1:",
+        "status": "failed",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "path": "basicExamples/swap_equals.janus",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{b = [0, 1, 2, 3, 4, 15, 16, 17, 8, 9, 10, 11, 12, 13, 14, 5, 6, 7, 18, 19], i = 5, j = 15, k = 3, n = 3}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{b = [0, 1, 2, 3, 4, 15, 16, 17, 8, 9, 10, 11, 12, 13, 14, 5, 6, 7, 18, 19], i = 5, j = 15, k = 3, n = 3}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 1,
+        "message": "File \"/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline/basicExamples/turing.janus\" in line 9, column 1:",
+        "status": "failed",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "path": "basicExamples/turing.janus",
+      "reverie": {
+        "exit_code": 1,
+        "message": "\u001b[31mError:\u001b[0m runtime error: if exit assertion expected true, found false",
+        "status": "failed",
+        "stderr_lines": 19,
+        "stdout_lines": 0
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 1,
+        "message": "\u001b[31mError:\u001b[0m runtime error: if exit assertion expected true, found false",
+        "status": "failed",
+        "stderr_lines": 19,
+        "stdout_lines": 0
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 0,
+        "message": "fact[20] = {0, 2, 2, 2, 3, 5, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      },
+      "path": "examples/factor.ja",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{fact = [0, 2, 2, 2, 3, 5, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], num = 0}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{fact = [0, 2, 2, 2, 3, 5, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], num = 0}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 0,
+        "message": "0 8 13",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 5
+      },
+      "path": "examples/fib.ja",
+      "reverie": {
+        "exit_code": 0,
+        "message": "0 8 13",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "0 8 13",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 0,
+        "message": "[Expected value to be `4' for local variable `_parse_tmp_0'",
+        "status": "ok_with_diagnostics",
+        "stderr_lines": 0,
+        "stdout_lines": 129
+      },
+      "path": "examples/matrixmult.ja",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{A = [[22, 254, 1562], [12, 141, 876], [22, 238, 1245]], B = [[2, 4, 4], [4, 1, 1], [2, 3, 4]], n = 3}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{a = [[22, 254, 1562], [12, 141, 876], [22, 238, 1245]], b = [[2, 4, 4], [4, 1, 1], [2, 3, 4]], n = 3}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 0,
+        "message": "A[3][3] = {{2, 4, 4}, {4, 1, 1}, {2, 3, 4}}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 6
+      },
+      "path": "examples/matrixmult_v1.0.ja",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{A = [[2, 4, 4], [4, 1, 1], [2, 3, 4]], B = [[24, -18, 32], [-12, -19, -9], [11, 9, 10]], LDU = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], n = 3, x = 2, y = 4}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{a = [[2, 4, 4], [4, 1, 1], [2, 3, 4]], b = [[24, -18, 32], [-12, -19, -9], [11, 9, 10]], ldu = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], n = 3, x = 2, y = 4}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 0,
+        "message": "x[6] = {2, 0, 3, 1, 5, 4}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      },
+      "path": "examples/perm-to-code.ja",
+      "reverie": {
+        "exit_code": 0,
+        "message": "x = [2, 0, 3, 1, 5, 4]",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "x = [2, 0, 3, 1, 5, 4]",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 0,
+        "message": "text = <32, 32, 53, 53, 53, 12]",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "path": "examples/run-length-enc-stack.ja",
+      "reverie": {
+        "exit_code": 0,
+        "message": "text = <32, 32, 53, 53, 53, 12]",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "text = <32, 32, 53, 53, 53, 12]",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 0,
+        "message": "arc[14] = {1, 2, 2, 3, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      },
+      "path": "examples/run-length-enc.ja",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{arc = [1, 2, 2, 3, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0], text = [0, 0, 0, 0, 0, 0, 0]}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{arc = [1, 2, 2, 3, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0], text = [0, 0, 0, 0, 0, 0, 0]}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 0,
+        "message": "66 0 ",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 6
+      },
+      "path": "examples/sqrt.ja",
+      "reverie": {
+        "exit_code": 0,
+        "message": "66 0 ",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "66 0 ",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 3
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 0,
+        "message": "s = <5, 4, 3, 2, 1]",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      },
+      "path": "examples/stack-operations.ja",
+      "reverie": {
+        "exit_code": 0,
+        "message": "s = <5, 4, 3, 2, 1]",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "s = <5, 4, 3, 2, 1]",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 2
+      }
+    },
+    {
+      "jana": {
+        "exit_code": 0,
+        "message": "[Expected value to be `42' for local variable `_parse_tmp_0'",
+        "status": "ok_with_diagnostics",
+        "stderr_lines": 0,
+        "stdout_lines": 9
+      },
+      "path": "examples/test2.ja",
+      "reverie": {
+        "exit_code": 0,
+        "message": "{test_array = [43, 17], test_int = 5}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      },
+      "reverie_legacy_janus": {
+        "exit_code": 0,
+        "message": "{test_array = [43, 17], test_int = 5}",
+        "status": "ok",
+        "stderr_lines": 0,
+        "stdout_lines": 1
+      }
+    }
+  ],
+  "jana_bin": "/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline/bin/janus",
+  "jana_dir": "/Users/perrinmyerson/Documents/Time Reversible/target/jana-baseline",
+  "reverie_bin": "/Users/perrinmyerson/Documents/Time Reversible/target/release/reverie",
+  "timeout_seconds": 10.0,
+  "totals": {
+    "jana": {
+      "failed": 11,
+      "ok": 8,
+      "ok_with_diagnostics": 2
+    },
+    "reverie": {
+      "failed": 1,
+      "ok": 20
+    },
+    "reverie_legacy_janus": {
+      "failed": 1,
+      "ok": 20
+    }
+  }
+}

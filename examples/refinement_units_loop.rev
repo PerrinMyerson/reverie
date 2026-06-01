@@ -1,0 +1,10 @@
+local distance: int<m> where distance >= 0<m> = 0<m>
+  local step: int<m> = 1<m>
+    from distance == 0<m> do
+      distance += step
+    loop
+      skip
+    until distance == 1<m>
+    distance -= step
+  delocal step = 1<m>
+delocal distance: int<m> where distance >= 0<m> = 0<m>

@@ -1,0 +1,91 @@
+// Historic Janus one-dimensional reversible cellular automata example.
+//
+// This is adapted from Jana's `basicExamples/automata.janus`. It exercises
+// legacy bare globals, global-store procedures, indexed array updates, nested
+// loops, bit operations, and reversible tape output.
+
+map[112]
+cell[3]
+cells
+steps
+
+rmap[112]
+i j
+n t1 t2 l r
+
+procedure cell
+    t1 <=> cell[i]
+    t2 ^= map[t1]
+    t1 ^= rmap[t2]
+    t2 <=> cell[i]
+
+procedure swapAux
+    r ^= cell[i] & 1
+    cell[i] ^= r
+    if (cell[j] & 100) = 100
+    then l ^= 1
+         cell[j] ^= 100
+    fi l = 1
+
+procedure swap
+    call swapAux
+    l <=> r
+    uncall swapAux
+
+procedure communicate
+    from i = 0
+    do j ^= i + 1
+       call swap
+       j ^= i + 1
+    loop i += 1
+    until i = cells - 2
+    i += 1
+    call swap
+    i ^= cells - 1
+
+procedure output
+    from i = 0
+    do write cell[i]
+       i += 1
+    until i = cells
+    i ^= cells
+
+procedure simulation
+    call output
+    from n = 0
+    do from i = 0
+       do call cell
+          i += 1
+       until i = cells
+       i ^= cells
+       call communicate
+       n += 1
+       call output
+    until n = steps
+    n ^= steps
+
+procedure compInvMap
+    from n = 0
+    do rmap[map[n]] ^= n
+       n += 1
+    until n = 112
+    n ^= 112
+
+procedure main
+    map[000] ^= 000
+    map[001] ^= 010
+    map[010] ^= 100
+    map[011] ^= 011
+    map[100] ^= 001
+    map[101] ^= 101
+    map[110] ^= 110
+    map[111] ^= 111
+    call compInvMap
+
+    cells ^= 3
+    cell[0] ^= 100
+    cell[1] ^= 100
+
+    steps ^= 1
+
+    call simulation

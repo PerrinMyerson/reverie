@@ -1,0 +1,7 @@
+// Negative static example: v1 locals may not shadow live names.
+
+local x: int = 0
+  local x: int = 0
+    skip
+  delocal x = 0
+delocal x = 0

@@ -1,0 +1,23 @@
+// Procedure-heavy reversible loop.
+//
+// Seed with:
+//   --var n=5 --var i=0 --var x=0 --var y=1
+//
+// Each iteration calls and uncalls the same by-reference procedure. The net
+// state change is only the loop counter, so this isolates procedure dispatch
+// cost without mixing in array work.
+proc bump(x, y) {
+  x += y
+}
+
+if n != 0 then
+  from i == 0 do
+    call bump(x, y);
+    uncall bump(x, y);
+    i += 1
+  loop
+    skip
+  until i == n
+else
+  skip
+fi n != 0

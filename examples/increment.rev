@@ -1,0 +1,8 @@
+// Increment and decrement are reversible update sugar.
+
+global x;
+global xs[2];
+
+++x;
+--xs[0];
+xs[1]++;

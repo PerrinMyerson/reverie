@@ -1,0 +1,16 @@
+// Janus-style procedure keyword and parameterless calls.
+//
+// Reverie still supports explicit by-reference parameters, but accepts
+// `procedure name { ... }`, `call name`, and `uncall name` for global-store
+// procedures.
+
+global x;
+
+procedure bump {
+  x += 1
+}
+
+procedure main {
+  call bump;
+  uncall bump
+}

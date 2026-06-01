@@ -1,0 +1,8 @@
+local width: int<m> = 3<m>
+  local height: int<m> = 4<m>
+    local area: int<m^2> = 0<m^2>
+      area += width * height;
+      area -= 12<m^2>
+    delocal area = 0<m^2>
+  delocal height = 4<m>
+delocal width = 3<m>

@@ -1,0 +1,28 @@
+// Permutation-to-code conversion.
+//
+// Given a permutation of 0..n-1, this computes the factorial-code style array
+// where each cell counts how many earlier elements are smaller. The transform
+// is reversible because each decrement is guarded by the final comparison
+// needed to run the loop backward. Seed with:
+//
+//   --var 'x=[2,0,3,1,5,4]'
+
+global x[6];
+
+procedure perm_to_code(int x[])
+    local int k = size(x)
+    from k = size(x) loop
+        k -= 1
+        local int j = 0
+        from j = 0 loop
+            if x[j] > x[k] then
+                x[j] -= 1
+            fi x[j] >= x[k]
+            j += 1
+        until j = k
+        delocal int j = k
+    until k = 0
+    delocal int k = 0
+
+procedure main
+    call perm_to_code(x)

@@ -1,0 +1,5 @@
+from i == 0 do
+  i += 1
+loop
+  i -= 1
+until i == n

@@ -1,0 +1,36 @@
+// Janus integer square-root example.
+//
+// Starting with num = N and root = 0, this computes root = floor(sqrt(N))
+// and leaves the remainder in num. The bit and z variables are explicit
+// witnesses for the reversible translation.
+
+global num;
+global root;
+global bit;
+global z;
+
+proc doublebit(bit, z) {
+  z += bit;
+  bit += z;
+  z -= bit / 2
+}
+
+proc root(num, root, bit, z) {
+  bit += 1;
+
+  from bit == 1 loop
+    call doublebit(bit, z)
+  until bit * bit > num;
+
+  from bit * bit > num do
+    uncall doublebit(bit, z);
+    if (root + bit) * (root + bit) <= num then
+      root += bit
+    fi (root / bit) % 2 != 0
+  until bit == 1;
+
+  bit -= 1;
+  num -= root * root
+}
+
+call root(num, root, bit, z)

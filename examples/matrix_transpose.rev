@@ -1,0 +1,16 @@
+// Reversible 3x3 matrix transpose.
+//
+// The nested loop swaps each off-diagonal pair exactly once. Seed with:
+//
+//   --var n=3
+//   --var 'm=[[1,2,3],[4,5,6],[7,8,9]]'
+
+proc transpose(n, m) {
+  iterate int i = 0 to n - 1
+    iterate int j = i + 1 to n - 1
+      m[i][j] <=> m[j][i]
+    end
+  end
+}
+
+call transpose(n, m)

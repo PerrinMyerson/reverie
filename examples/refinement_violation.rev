@@ -1,0 +1,5 @@
+// This parses and checks statically, but fails at runtime: the local `n`
+// violates its refinement after the body runs.
+local n: int where n >= 0 = 0
+  n -= 1
+delocal n = 0 - 1

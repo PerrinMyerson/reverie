@@ -1,0 +1,65 @@
+/*
+ * Jana/Janus baseline for a small reversible Schroedinger wave-equation kernel.
+ *
+ * This is a modern-Jana fixture inspired by Jana's legacy
+ * basicExamples/schroedinger.janus. It keeps the same reversible update shape:
+ * a real pass using psiI neighbors, followed by an inverse imaginary pass using
+ * the updated psiR values. Modern Jana does not parse the legacy fixed-point
+ * multiplication operator, so this fixture uses small integer coefficients and
+ * ordinary integer multiplication. The domain is intentionally small enough for
+ * routine checked end-to-end benchmarking.
+ *
+ * Run with:
+ *
+ *   janus -m64 benchmarks/jana/schroedinger_n16_t100.ja
+ */
+
+procedure pfuncR(int i, int epsilon, int alphas[], int psiR[], int psiI[])
+    psiR[i] += alphas[i] * psiI[i]
+    psiR[i] -= epsilon * psiI[(i + 1) & 15]
+    psiR[i] -= epsilon * psiI[(i - 1) & 15]
+
+procedure pfuncI(int i, int epsilon, int alphas[], int psiR[], int psiI[])
+    psiI[i] += alphas[i] * psiR[i]
+    psiI[i] -= epsilon * psiR[(i + 1) & 15]
+    psiI[i] -= epsilon * psiR[(i - 1) & 15]
+
+procedure schstep(int i, int epsilon, int alphas[], int psiR[], int psiI[])
+    from i = 0 loop
+        call pfuncR(i, epsilon, alphas, psiR, psiI)
+        i += 1
+    until i = 16
+    i -= 16
+
+    from i = 0 loop
+        uncall pfuncI(i, epsilon, alphas, psiR, psiI)
+        i += 1
+    until i = 16
+    i -= 16
+
+procedure schroed(int j, int i, int epsilon, int alphas[], int psiR[], int psiI[])
+    from j = 0 loop
+        call schstep(i, epsilon, alphas, psiR, psiI)
+        j += 1
+    until j = 100
+    j -= 100
+
+procedure main()
+    int epsilon = 3
+    int alphas[16] = {
+        17, 16, 15, 14,
+        13, 12, 11, 10,
+        10, 11, 12, 13,
+        14, 15, 16, 17
+    }
+    int psiR[16] = {
+        2, 3, 4, 6,
+        9, 12, 17, 23,
+        31, 42, 55, 72,
+        93, 118, 148, 184
+    }
+    int psiI[16]
+    int i
+    int j
+
+    call schroed(j, i, epsilon, alphas, psiR, psiI)

@@ -1,0 +1,6 @@
+local xs: array<int> = [1, 2, 3]
+  local n: int = 0
+    n += len(xs);
+    n -= 3
+  delocal n = 0
+delocal xs = [1, 2, 3]

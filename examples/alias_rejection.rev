@@ -1,0 +1,5 @@
+proc add(x, y) {
+  x += y
+}
+
+call add(n, n)

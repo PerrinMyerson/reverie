@@ -1,0 +1,33 @@
+/*
+ * Jana/Janus baseline for the reverse square-root benchmark.
+ *
+ * Starts from the final state of Jana's sqrt.ja example for 66 and runs the
+ * root procedure backward with uncall.
+ */
+
+procedure doublebit(int bit)
+    local int z = bit
+    bit += z
+    delocal int z = bit / 2
+
+procedure root(int num, int root)
+    local int bit = 1
+    from bit = 1 loop
+        call doublebit(bit)
+    until (bit * bit) > num
+
+    from (bit * bit) > num do
+        uncall doublebit(bit)
+        if ((root + bit) * (root + bit)) <= num then
+            root += bit
+        fi (root / bit) % 2 != 0
+    until bit = 1
+    delocal int bit = 1
+    num -= root * root
+
+procedure main()
+    int num = 2
+    int root = 8
+
+    uncall root(num, root)
+    printf("%d %d\n", num, root)

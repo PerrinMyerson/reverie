@@ -1,0 +1,10 @@
+// Reversible boolean flag-table updates.
+//
+// Boolean arrays use the same reversible indexed update rules as integer
+// arrays. Seed with:
+//
+//   --var 'flags=[false,true,false]' --type 'flags=array<bool>'
+
+flags[0] ^= true;
+flags[1] ^= false;
+flags[2] ^= true

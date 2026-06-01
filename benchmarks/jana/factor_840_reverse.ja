@@ -1,0 +1,58 @@
+/*
+ * Jana/Janus baseline for the reverse factorization benchmark.
+ *
+ * Starts from the final state of factor.ja for 840 and uncalls factor to
+ * restore the original number and zero the factor table.
+ */
+
+procedure zeroi(int i, int fact[])
+    from fact[i+1] = 0 loop
+        i -= 1
+    until i = 0
+
+procedure nexttryFactor(int tryFactor)
+    tryFactor += 2
+    if tryFactor = 4 then
+        tryFactor -= 1
+    fi tryFactor = 3
+
+procedure factor(int num, int fact[])
+    local int tryFactor = 0
+    local int i = 0
+    from (tryFactor = 0) && (num > 1) loop
+        call nexttryFactor(tryFactor)
+        from fact[i] != tryFactor loop
+            i += 1
+            fact[i] += tryFactor
+            local int z = num / tryFactor
+            z <=> num
+            delocal int z = num * tryFactor
+        until (num % tryFactor) != 0
+    until (tryFactor * tryFactor) > num
+
+    if num != 1 then
+        i += 1
+        fact[i] ^= num
+        num     ^= fact[i]
+        fact[i] ^= num
+    else
+        num -= 1
+    fi fact[i] != fact[i-1]
+
+    if (fact[i-1] * fact[i-1]) < fact[i] then
+        from (tryFactor * tryFactor) > fact[i] loop
+            uncall nexttryFactor(tryFactor)
+        until tryFactor = 0
+    else
+        tryFactor -= fact[i-1]
+    fi (fact[i-1] * fact[i-1]) < fact[i]
+
+    call zeroi(i, fact)
+    delocal int i = 0
+    delocal int tryFactor = 0
+
+procedure main()
+    int num = 0
+    int fact[20] = {0, 2, 2, 2, 3, 5, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+
+    uncall factor(num, fact)

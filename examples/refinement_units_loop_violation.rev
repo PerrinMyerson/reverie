@@ -1,0 +1,3 @@
+local distance: int<m> where distance >= 0<m> = 0<m>
+  distance -= 1<m>
+delocal distance: int<m> where distance >= 0<m> = -1<m>

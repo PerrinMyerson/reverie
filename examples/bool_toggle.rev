@@ -1,0 +1,8 @@
+// Reversible boolean flag toggle.
+//
+// `^=` works on booleans as xor: toggling by `true` flips the flag, and the
+// same statement run backward flips it back. Seed with:
+//
+//   --var flag=false --type flag=bool
+
+flag ^= true

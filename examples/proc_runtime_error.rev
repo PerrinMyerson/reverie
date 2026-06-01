@@ -1,0 +1,10 @@
+// Negative procedure diagnostic example.
+//
+// This should fail `reverie run` with both the failing expression inside the
+// procedure and the call site that entered it:
+//   reverie run examples/proc_runtime_error.rev --var n=1 --var z=0
+proc boom(x, z) {
+  x += 1 / z
+}
+
+call boom(n, z)

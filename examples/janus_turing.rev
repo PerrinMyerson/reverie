@@ -1,0 +1,121 @@
+// Strict reversible translation of Jana's historic Turing machine simulation.
+//
+// The upstream `basicExamples/turing.janus` uses a guarded-rule style where
+// several rules can share the same current state. Reverie's reversible `if`
+// checks the trailing assertion for the selected branch, so the rule-selection
+// guard is made explicit here: a rule is selected only when the state matches
+// and either the symbol rule matches or the rule is a shift rule.
+
+q
+s
+leftstk[4]
+leftsp
+rightstk[4]
+rightsp
+q1[8] s1[8]
+s2[8] q2[8]
+PC_MAX
+pc
+QS
+QF
+slash
+right
+left
+blank
+
+procedure turing
+    from q = QS
+    do
+        call inst
+        pc += 1
+        if pc = PC_MAX then
+            pc ^= PC_MAX
+        fi pc = 0
+    until q = QF
+
+procedure inst
+    if (q = q1[pc]) && ((s = s1[pc]) || (s1[pc] = slash)) then
+        if s = s1[pc] then
+            q += q2[pc] - q1[pc]
+            s += s2[pc] - s1[pc]
+        else
+            if s1[pc] = slash then
+                q += q2[pc] - q1[pc]
+                if s2[pc] = right then
+                    call pushleft
+                    uncall pushright
+                else
+                    if s2[pc] = left then
+                        call pushright
+                        uncall pushleft
+                    fi s2[pc] = left
+                fi s2[pc] = right
+            fi s1[pc] = slash
+        fi s = s2[pc]
+    fi q = q2[pc]
+
+procedure pushleft
+    if (leftsp = 0) && (s = blank) then
+        s ^= blank
+    else
+        leftstk[leftsp] ^= s
+        leftsp += 1
+    fi leftsp = 0
+
+procedure pushright
+    if (rightsp = 0) && (s = blank) then
+        s ^= blank
+    else
+        rightstk[rightsp] ^= s
+        rightsp += 1
+    fi rightsp = 0
+
+procedure init
+    left ^= 100
+    slash ^= 101
+    right ^= 102
+    blank ^= 200
+
+procedure binaryInc
+    PC_MAX ^= 8
+    q ^= 1
+    QS ^= 1
+    QF ^= 6
+    q1[0] ^= 1
+    s1[0] ^= blank
+    s2[0] ^= blank
+    q2[0] ^= 2
+    q1[1] ^= 2
+    s1[1] ^= slash
+    s2[1] ^= right
+    q2[1] ^= 3
+    q1[2] ^= 3
+    s1[2] ^= 0
+    s2[2] ^= 1
+    q2[2] ^= 4
+    q1[3] ^= 3
+    s1[3] ^= 1
+    s2[3] ^= 0
+    q2[3] ^= 2
+    q1[4] ^= 3
+    s1[4] ^= blank
+    s2[4] ^= blank
+    q2[4] ^= 4
+    q1[5] ^= 4
+    s1[5] ^= slash
+    s2[5] ^= left
+    q2[5] ^= 5
+    q1[6] ^= 5
+    s1[6] ^= 0
+    s2[6] ^= 0
+    q2[6] ^= 4
+    q1[7] ^= 5
+    s1[7] ^= blank
+    s2[7] ^= blank
+    q2[7] ^= 6
+
+procedure main
+    call init
+    call binaryInc
+    s ^= blank
+    call turing

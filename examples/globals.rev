@@ -1,0 +1,13 @@
+// Janus-style source globals: declared variables start at zero unless seeded.
+
+global x;
+global xs[3];
+global bool flag;
+
+proc main() {
+  x += 1;
+  flag ^= true;
+  xs[0] += x;
+  xs[1] += 2;
+  xs[2] += x
+}

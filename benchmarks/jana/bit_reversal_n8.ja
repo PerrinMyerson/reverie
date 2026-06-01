@@ -1,0 +1,19 @@
+/*
+ * Jana/Janus baseline for an 8-element bit-reversal permutation.
+ */
+
+procedure bitrev(int n, int xs[], int perm[])
+    iterate int i = 0 to n - 1
+        if i < perm[i] then
+            xs[i] <=> xs[perm[i]]
+        else
+            skip
+        fi i < perm[i]
+    end
+
+procedure main()
+    int n = 8
+    int xs[8] = {10, 20, 30, 40, 50, 60, 70, 80}
+    int perm[8] = {0, 4, 2, 6, 1, 5, 3, 7}
+
+    call bitrev(n, xs, perm)

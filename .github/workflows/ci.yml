@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "Measured runs per benchmark"
+        default: "5"
+        required: true
+      warmup:
+        description: "Warmup runs per benchmark"
+        default: "1"
+        required: true
+      min-speedup:
+        description: "Required median Jana/Reverie speedup"
+        default: "1.25"
+        required: true
+      min-observed-speedup:
+        description: "Required floor for every observed workload speedup"
+        default: "2.0"
+        required: true
+      min-median-speedup:
+        description: "Required floor for the suite median observed speedup"
+        default: "4.0"
+        required: true
+      min-geomean-speedup:
+        description: "Required floor for the geometric mean observed speedup"
+        default: "4.0"
+        required: true
+      command-timeout:
+        description: "Timeout in seconds for each benchmark command"
+        default: "30"
+        required: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Format
+        run: cargo fmt --check
+      - name: Source materialization
+        run: python3 scripts/check_materialized_sources.py
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --workspace
+      - name: Compile Criterion benchmarks
+        run: cargo bench -p reverie-interp --bench execution --no-run
+      - name: Benchmark tooling smoke
+        run: |
+          python3 -m py_compile \
+            scripts/bench_jana_vs_reverie.py \
+            scripts/check_benchmark_artifact.py \
+            scripts/check_benchmark_docs.py \
+            scripts/check_ci_workflow.py \
+            scripts/check_criterion_docs.py \
+            scripts/check_evaluation_corpus.py \
+            scripts/check_explain_json.py \
+            scripts/check_janus_feature_audit.py \
+            scripts/check_jana_audit.py \
+            scripts/summarize_janus_performance.py \
+            scripts/verify_janus_performance.py \
+            scripts/check_materialized_sources.py
+          python3 scripts/check_benchmark_artifact.py --self-test
+          python3 scripts/bench_jana_vs_reverie.py --self-test
+          python3 scripts/summarize_janus_performance.py --self-test
+          python3 scripts/verify_janus_performance.py --self-test
+          python3 scripts/check_materialized_sources.py --self-test
+          python3 scripts/check_benchmark_docs.py --self-test
+          python3 scripts/check_evaluation_corpus.py --self-test
+          python3 scripts/check_jana_audit.py --self-test
+          python3 scripts/check_janus_feature_audit.py --self-test
+          python3 scripts/bench_jana_vs_reverie.py --list-workloads
+          python3 scripts/check_benchmark_artifact.py \
+            benchmarks/results/jana-vs-reverie-smoke.json \
+            --min-workloads 41 \
+            --require-direction forward \
+            --require-direction reverse \
+            --require-direction roundtrip \
+            --expect-current-workloads \
+            --exact-workloads-file benchmarks/jana-workload-corpus.txt \
+            --expect-workload-order \
+            --expect-runs 5 \
+            --expect-warmup 1 \
+            --expect-command-timeout 30.0 \
+            --expect-min-speedup 1.25 \
+            --expect-direction-count forward:19 \
+            --expect-direction-count reverse:12 \
+            --expect-direction-count roundtrip:10 \
+            --min-observed-speedup 2.0 \
+            --min-median-speedup 4.0 \
+            --min-geomean-speedup 4.0 \
+            --expect-performance-gate \
+            --expect-source-digests \
+            --expect-jana-bin-suffix target/jana-baseline/bin/janus \
+            --expect-reverie-bin-suffix target/release/reverie \
+            --expect-markdown-summary benchmarks/results/jana-vs-reverie-smoke.md
+          python3 scripts/check_benchmark_docs.py
+          python3 scripts/check_ci_workflow.py
+          python3 scripts/check_criterion_docs.py
+          python3 scripts/check_evaluation_corpus.py
+          python3 scripts/check_explain_json.py
+          python3 scripts/check_janus_feature_audit.py \
+            --min-features 30 \
+            --expect-feature "Program-level global declarations" \
+            --expect-feature "Reversible updates \`+=\`, \`-=\`" \
+            --expect-feature "\`read\` statement" \
+            --expect-feature "Case-insensitive identifiers"
+          python3 scripts/check_jana_audit.py \
+            benchmarks/results/jana-example-audit.json \
+            --min-examples 21 \
+            --exact-paths-file benchmarks/jana-example-corpus.txt \
+            --expect-timeout 10.0 \
+            --expect-jana-bin-suffix target/jana-baseline/bin/janus \
+            --expect-reverie-bin-suffix target/release/reverie \
+            --min-status reverie:ok:20 \
+            --min-status reverie_legacy_janus:ok:20 \
+            --expect-total jana:ok:8 \
+            --expect-total jana:ok_with_diagnostics:2 \
+            --expect-total jana:failed:11 \
+            --expect-total reverie:ok:20 \
+            --expect-total reverie:failed:1 \
+            --expect-total reverie_legacy_janus:ok:20 \
+            --expect-total reverie_legacy_janus:failed:1 \
+            --expect-status reverie:basicExamples/turing.janus:failed \
+            --expect-status reverie_legacy_janus:basicExamples/turing.janus:failed
+
+  janus-performance:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run checked Janus performance gate
+        run: |
+          scripts/verify_janus_performance.py \
+            --runs "${{ inputs.runs }}" \
+            --warmup "${{ inputs.warmup }}" \
+            --min-speedup "${{ inputs.min-speedup }}" \
+            --min-observed-speedup "${{ inputs.min-observed-speedup }}" \
+            --min-median-speedup "${{ inputs.min-median-speedup }}" \
+            --min-geomean-speedup "${{ inputs.min-geomean-speedup }}" \
+            --command-timeout "${{ inputs.command-timeout }}"
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jana-vs-reverie-smoke
+          path: |
+            benchmarks/results/jana-vs-reverie-smoke.json
+            benchmarks/results/jana-vs-reverie-smoke.md

@@ -1,0 +1,22 @@
+# Upstream Jana files covered by benchmarks/results/jana-example-audit.json.
+basicExamples/automata.janus
+basicExamples/factor.janus
+basicExamples/fib.janus
+basicExamples/perm_to_code.janus
+basicExamples/root.janus
+basicExamples/runlength_encoding.janus
+basicExamples/schroedinger.janus
+basicExamples/smf.janus
+basicExamples/sort.janus
+basicExamples/swap_equals.janus
+basicExamples/turing.janus
+examples/factor.ja
+examples/fib.ja
+examples/matrixmult.ja
+examples/matrixmult_v1.0.ja
+examples/perm-to-code.ja
+examples/run-length-enc-stack.ja
+examples/run-length-enc.ja
+examples/sqrt.ja
+examples/stack-operations.ja
+examples/test2.ja

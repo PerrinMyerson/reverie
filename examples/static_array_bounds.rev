@@ -1,0 +1,17 @@
+// Negative static array-bounds example.
+//
+// The local initializer makes the fixed array shape known, so this is rejected
+// by `reverie check` instead of waiting until runtime:
+//
+//   reverie check examples/static_array_bounds.rev
+proc inner(xs: array<int>) {
+  xs[3] += 1
+}
+
+proc outer(xs: array<int>) {
+  call inner(xs)
+}
+
+local xs: array<int> = [1, 2, 3]
+  call outer(xs)
+delocal xs = [1, 2, 3]

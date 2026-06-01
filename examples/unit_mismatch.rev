@@ -1,0 +1,3 @@
+local speed: int<m/s> = 0<m/s>
+  speed += 1<m>
+delocal speed = 1<m/s>

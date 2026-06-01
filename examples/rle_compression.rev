@@ -1,0 +1,27 @@
+// Reversible run-length encoding.
+//
+// This builds a compact run table from an input array while keeping the source
+// array as the witness needed for exact reversal. Seed with:
+//
+//   --var n=8 --var run=0
+//   --var 'data=[2,2,2,5,5,1,1,1]'
+//   --var 'symbols=[0,0,0,0,0,0,0,0]'
+//   --var 'counts=[0,0,0,0,0,0,0,0]'
+
+proc rle(n, run, data, symbols, counts) {
+  symbols[0] += data[0];
+  counts[0] += 1;
+  run += 1;
+
+  iterate int i = 1 to n - 1
+    if data[i] != data[i - 1] then
+      symbols[run] += data[i];
+      counts[run] += 1;
+      run += 1
+    else
+      counts[run - 1] += 1
+    fi data[i] != data[i - 1]
+  end
+}
+
+call rle(n, run, data, symbols, counts)

@@ -1,0 +1,6 @@
+if x < y then
+  x <=> y;
+  swapped += 1
+else
+  skip
+fi swapped == 1

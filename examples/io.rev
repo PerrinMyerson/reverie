@@ -1,0 +1,5 @@
+global x;
+
+write x;
+read x;
+write x

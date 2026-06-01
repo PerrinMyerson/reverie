@@ -1,0 +1,71 @@
+/*
+ * Reverse Jana/Janus baseline for schroedinger_n16_t100.ja.
+ *
+ * Seeds the final wave-kernel state and uncomputes it back to the original
+ * arrays. Run with:
+ *
+ *   janus -m64 benchmarks/jana/schroedinger_n16_t100_reverse.ja
+ */
+
+procedure pfuncR(int i, int epsilon, int alphas[], int psiR[], int psiI[])
+    psiR[i] += alphas[i] * psiI[i]
+    psiR[i] -= epsilon * psiI[(i + 1) & 15]
+    psiR[i] -= epsilon * psiI[(i - 1) & 15]
+
+procedure pfuncI(int i, int epsilon, int alphas[], int psiR[], int psiI[])
+    psiI[i] += alphas[i] * psiR[i]
+    psiI[i] -= epsilon * psiR[(i + 1) & 15]
+    psiI[i] -= epsilon * psiR[(i - 1) & 15]
+
+procedure schstep(int i, int epsilon, int alphas[], int psiR[], int psiI[])
+    from i = 0 loop
+        call pfuncR(i, epsilon, alphas, psiR, psiI)
+        i += 1
+    until i = 16
+    i -= 16
+
+    from i = 0 loop
+        uncall pfuncI(i, epsilon, alphas, psiR, psiI)
+        i += 1
+    until i = 16
+    i -= 16
+
+procedure schroed(int j, int i, int epsilon, int alphas[], int psiR[], int psiI[])
+    from j = 0 loop
+        call schstep(i, epsilon, alphas, psiR, psiI)
+        j += 1
+    until j = 100
+    j -= 100
+
+procedure main()
+    int epsilon = 3
+    int alphas[16] = {
+        17, 16, 15, 14,
+        13, 12, 11, 10,
+        10, 11, 12, 13,
+        14, 15, 16, 17
+    }
+    int psiR[16] = {
+        7492701239833544101, -6349349935115478538,
+        -8998743017567747236, 1132692900791859979,
+        7732596690609602160, -7141354382050438537,
+        -619746662238118711, 4278498264227663332,
+        5888699464625555294, -4315445307137226226,
+        2004386418750668596, 134370324756951889,
+        -8070878621892691292, 1946795834503771706,
+        1118711695460874909, 5114806227275059749
+    }
+    int psiI[16] = {
+        1090965397192754749, 8357816183223517593,
+        -903136016014472561, -2248272020363884360,
+        2370969452233211356, 7191497602641481837,
+        -538919007294570837, 7307773671519167027,
+        1236331457862333962, 1462271174428245944,
+        -9148472539760599954, 2560704284329755561,
+        7627490374347364124, 1080031045274332963,
+        9030791016758320627, 2932215343476868658
+    }
+    int i
+    int j
+
+    uncall schroed(j, i, epsilon, alphas, psiR, psiI)
