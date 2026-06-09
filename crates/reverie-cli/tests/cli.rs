@@ -11,6 +11,26 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn strip_ansi_csi(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\u{1b}' && chars.peek() == Some(&'[') {
+            chars.next();
+            for code in chars.by_ref() {
+                if code.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            output.push(ch);
+        }
+    }
+
+    output
+}
+
 #[test]
 fn check_skip_example_succeeds() {
     let example = workspace_root().join("examples/skip.rev");
@@ -1057,16 +1077,25 @@ fn standalone_assert_example_runs_forward_and_backward() {
 fn standalone_assert_failure_example_reports_runtime_span() {
     let example = workspace_root().join("examples/assert_failure.rev");
 
-    Command::cargo_bin("reverie")
+    let assert = Command::cargo_bin("reverie")
         .expect("binary exists")
         .arg("run")
         .arg(example)
         .args(["--var", "x=0"])
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("assertion expected true"))
-        .stderr(predicate::str::contains("assert_eq(x, 1)"))
-        .stderr(predicate::str::contains("runtime failed here"));
+        .failure();
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    let plain_stderr = strip_ansi_csi(&stderr);
+
+    assert!(
+        plain_stderr.contains("assertion expected true"),
+        "{plain_stderr}"
+    );
+    assert!(plain_stderr.contains("assert_eq(x, 1)"), "{plain_stderr}");
+    assert!(
+        plain_stderr.contains("runtime failed here"),
+        "{plain_stderr}"
+    );
 }
 
 #[test]
