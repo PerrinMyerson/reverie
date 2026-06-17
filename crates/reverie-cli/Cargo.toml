@@ -4,18 +4,26 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+default-run = "reverie"
 
 [[bin]]
 name = "reverie"
 path = "src/main.rs"
 
+[[bin]]
+name = "reverie-mnist-linear"
+path = "src/bin/reverie-mnist-linear.rs"
+
 [dependencies]
 ariadne.workspace = true
 clap.workspace = true
+libc.workspace = true
 reverie-core.workspace = true
 reverie-interp.workspace = true
 reverie-syntax.workspace = true
 reverie-tui.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

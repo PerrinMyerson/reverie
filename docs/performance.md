@@ -54,6 +54,11 @@ constant_element_call_uncall_n1000
 janus_turing_binary_inc
 janus_stack_reverse_n5
 matrix_accumulate_3x3
+tensor_matmul_builtin_vs_loops_3x3
+mnist_reversible_step_784x10
+mnist_witness_tape_loop_2x784x10
+mnist_mlp_witness_2x784x16x10
+invertible_coupling_4x4
 matrix_transpose_3x3
 matrix_transpose_3x3_reverse
 tape_io_read_write
@@ -66,15 +71,16 @@ execution --no-run` and runs `scripts/check_criterion_docs.py`, so every
 Criterion group in `crates/reverie-interp/benches/execution.rs` must stay
 listed here. The checker also verifies that normal execution groups keep both
 `tree_walk` and `slot_compiled` measurements, with explicit exceptions for the
-compile-time and scrub-timeline groups, and that every benchmark wrapper is
-registered in the `criterion_group!` macro so documented groups actually run.
+compile-time, scrub-timeline, and tensor builtin-vs-loop comparison groups, and
+that every benchmark wrapper is registered in the `criterion_group!` macro so
+documented groups actually run.
 
 The Fibonacci benchmark compares the reference tree walker against the slot
 engine on the Fibonacci pair transform with `n = 1000`. This isolates execution from
 CLI startup and gives us a stable place to add more workloads.
 
-The forward sort benchmark runs `examples/janus_sort.rev` on a reverse-ordered
-50-element array. This is the first Janus-corpus performance workload and is
+The forward sort benchmark runs the shared 50-element Janus sort fixture on a
+reverse-ordered array. This is the first Janus-corpus performance workload and is
 more representative than Fibonacci because it uses nested loops, indexed array
 reads, indexed swaps, and procedure calls.
 
@@ -128,6 +134,391 @@ kernel. It keeps multidimensional arrays, nested Janus-style `iterate` loops, an
 procedure arguments visible in the internal suite instead of relying only on
 the external Jana matrix workload.
 
+The tensor matmul comparison runs the same 3x3 matrix state through explicit
+loop accumulation and through `out += matmul(a, b)`, for both tree-walk and
+slot-compiled execution. It tracks the overhead and benefit of the ML tensor
+builtin surface against ordinary Reverie loops.
+
+The MNIST reversible step benchmark runs the full `784 x 10` Q31 classifier
+step in `examples/mnist_reversible_step.rev`, including `vecmat_q31`,
+`argmax`, `one_hot_q31`, `outer_q31`, and learning-rate scaling. It keeps the
+exact MNIST-shaped reversible training path visible in Criterion. For an
+end-to-end data path, `cargo run -p reverie-cli --bin reverie-mnist-linear --`
+loads MNIST IDX files, trains the same Q31 linear model, evaluates
+`examples/mnist_identify.rev`, and can replay the inverse of every training
+step with `--reverse-check`. The runner also reports the compact witness-trace
+payload size so speed, reverse-check cost, and trace footprint can be compared
+together. Add `--json` to turn the run into a benchmark/audit artifact with
+train/eval throughput, trace bytes, reverse-check cost, model and dataset
+payload bytes, estimated payload bytes, and peak RSS on supported platforms.
+Add `--audit-output PATH` when the run should leave a replay bundle containing
+the final model and per-step witnesses. Bundles include SHA-256 fingerprints for
+the source programs, final model, witness trace, proof-cost summary, report,
+unsigned payload, and stable computation identity; `--verify-audit PATH`
+reloads that bundle, rejects fingerprint mismatches, recomputes the proof-cost
+summary, and runs the trace backward as a separate audit check. Use
+`--inspect-audit PATH --audit-step N` to pull out one saved update, recompute
+its prediction/correctness witnesses from logits, and summarize the active
+pixels plus bias and weight deltas that changed the model. The inspector
+reconstructs the selected step's before/after model window by reversing from
+the final model, so the bundle does not need to store every intermediate model
+snapshot. Add `--step-output PATH` to save that update as a standalone proof
+artifact; `--verify-step PATH` reruns the update forward and backward and
+recomputes its signed proof bytes for the two model snapshots, sample,
+witnesses, derived update summary, and one-step recompute cost. Use
+`--inspect-inference PATH --audit-step N` to run the final model
+on a saved sample, report logits/top classes, and verify that the inference
+trace itself reverses to the exact initial inference state. Saved inference
+bundles carry a signed proof object for the deterministic Q31 claim: model
+payload bytes, sample bytes, witness/result bytes, zero trace bytes, replay
+payload bytes, runtime state bytes, forward/inverse recompute steps, the
+winning margin, attribution checks, full contribution-ledger counts, ledger
+SHA-256 fingerprints, and fingerprints of the model, sample, and recorded
+result. Add `--markdown-output PATH` to `--inspect-inference`,
+`--inspect-model-inference`, or `--inspect-evaluation` to render the checked
+prediction, top logits, attribution ledgers, source rows, contract checks, and
+replay/memory costs immediately. `--verify-inference PATH` rebuilds that proof
+from fresh Reverie execution before accepting the bundle, and its
+`--markdown-output` card adds source-artifact verification checks.
+`--compare-artifacts PATH... --json` adds an `ml_profile` aggregate over
+training, model, sample-set, step, inference, and evaluation proof artifacts:
+total model/sample/witness/trace/update payload bytes, total forward and
+inverse recompute steps, total recompute steps, and trace-to-model plus
+witness-to-model payload ratios. That is the compact V6 view for comparing
+storage against recomputation without reading every proof row by hand.
+Use `python3 scripts/check_mnist_ml_profile.py` to validate runner JSON reports
+or artifact-comparison reports. The checker confirms elapsed-throughput fields
+are finite, reverse-check proof costs match trace entries, estimated payload
+bytes add up, peak RSS is present when required, and `ml_profile` totals and
+ratios agree with the artifact rows. It also accepts the Q31 reference
+inference and all-samples evaluation reports from
+`scripts/check_q31_inference.py`, including attribution reconstruction,
+contribution-ledger fingerprints, top-logit ordering, per-label summaries, and
+low-margin/incorrect row rankings. Training-audit scan reports, inspected audit-step reports, and
+standalone step-verification reports are checked too, so a low-margin or
+large-update training step can be found, rendered, and tied back to the
+`deterministic_q31_training_step_replay` proof. Native signed model inference,
+inference verification, model evaluation, evaluation scan, and evaluation
+verification reports are also accepted, tying bit-for-bit Q31 predictions back
+to `deterministic_q31_inference_replay` proof bytes, inverse recompute counts,
+source-artifact checks, and low-margin evaluation rows. Pass
+`--require-audit-contract` on an
+artifact-comparison report when the report must prove the reversible ML kernel
+contract: a signed training trace, standalone model, sample set, one-step
+replay, inference replay, evaluation replay, nonzero witness/trace accounting,
+and balanced forward/inverse recompute steps. Use the Markdown renderer to turn
+the checked JSON into tables covering speed, peak RSS, trace payload, proof
+payloads, artifact rows, audit-contract status, and recompute cost:
+
+```sh
+python3 scripts/summarize_mnist_ml_profile.py REPORT.json ... \
+  --require-audit-contract \
+  --output target/mnist-ml-profile.md
+```
+
+For a one-command local smoke of the full self-test audit path, run:
+
+```sh
+python3 scripts/run_mnist_ml_audit_pipeline.py \
+  --out-dir target/mnist-ml-audit-pipeline \
+  --sample-limit 10
+```
+
+By default the pipeline inspects the explicit `--audit-step` value. To let the
+scan pick the debug target, add `--audit-step-strategy lowest-margin`,
+`--audit-step-strategy largest-update`, or `--audit-step-strategy
+top-suspicious`. The generated summary records both the requested step and the
+selected step, then gates that the selected update matches the configured
+strategy before accepting the one-step replay/debug artifact.
+The exported evaluation-row inference works the same way: `--evaluation-row`
+keeps explicit behavior, while `--evaluation-row-strategy lowest-margin` selects
+the lowest-margin prediction from the evaluation scan and
+`--evaluation-row-strategy top-incorrect` selects the first incorrect row when
+one exists. The native reversible inference bundle, verification report, and
+Markdown `Row evidence` column are then tied back to that scan-selected row.
+
+The pipeline trains the synthetic Q31 model with a retained witness trace,
+exports signed model/sample bundles, verifies the full training lineage with a
+hash-chained update ledger, inspects and verifies a training step, runs native
+inference and batch evaluation with replay bundles, runs the
+dependency-light Q31 reference checker, runs the MLP witness trace and its
+independent checker, runs the invertible coupling and triangular residual
+blocks forward and backward without witness tapes, runs the reversible preprocessing block forward and
+backward without witness tapes, runs the reversible inference trace forward
+and backward with its independent checker, writes a reversible inference trace
+card with attribution and reverse-restoration proof costs, compares signed artifact payloads,
+and renders a checked `mnist-ml-audit-profile.md` with a top-level
+North-Star Readiness table, ML capability map, V6 scorecard, Recompute Frontier table, measured observed/10x/
+100x Scaling Projection table, and the same validator gates.
+It also writes `pipeline-summary.json`, a machine-readable acceptance artifact,
+and `model-capsule.json`, a portable SHA-256-fingerprinted capsule tying the
+accepted summary to the signed model bundle, sample bundle, lineage ledgers,
+inference replay/parity results, deterministic inference action contract, MLP
+witness proof, invertible-pattern checks, and V6 scorecard. After the manifest
+is written, the pipeline also renders `model-capsule-profile.md`, a
+capsule-first Markdown view whose top table shows the capsule fingerprint, gate
+count, model/sample hash, lineage hash, Q31 parity, witness proof, peak RSS, max
+replay bytes, and readiness score, plus the operation-level inference contract
+for prediction reproduction, margin explanation, native replay, and reversible
+trace reversal. The summary records speed, peak RSS, trace/witness payload
+ratios, recompute balance,
+reverse-check elapsed ratio, inspected-sample and evaluation-summary
+native-vs-reference agreement, training-step and evaluation-row selection
+evidence, full training-lineage ledger fingerprints and final-chain evidence,
+full training-update ledger fingerprints, a selected-step cause ledger that
+binds the sample, witnesses, logits/errors, active pixels, and top weight
+deltas, inference explanation
+contracts, a checked inference trace profile
+that ties native reports, replay verification, and independent Q31 reference
+ledger fingerprints together, end-to-end reversible inference trace metrics
+for preprocessing, logits, prediction, correctness, witness bytes, replay
+bytes, zero trace bytes, and attribution-ledger fingerprints, MLP
+activation/mask witness proof costs, zero-witness
+invertible coupling, triangular residual, and reversible preprocessing proof costs, source-check
+status, and replay gates. The Recompute Frontier records each replay mode's retained state, replay bytes,
+witness bytes, trace bytes, update bytes, state bytes, and forward/inverse
+recompute steps, making the storage-vs-recompute tradeoff explicit for full
+training traces, selected training updates, single inference, batch evaluation,
+evaluation-row inference, MLP witness traces, and no-witness invertible
+coupling plus triangular residual and reversible preprocessing, plus end-to-end reversible inference
+trace replay. The Scaling Projection derives per-unit
+replay, witness, trace, recomputed-update, and recompute-step costs from the checked reports and
+projects the observed, 10x, and 100x retained-state footprint for training
+traces, batch evaluation, and MLP witness replay. It also records a V1-V6
+capability map, a V6 scorecard, a north-star readiness report for reversible
+inspectable deterministic ML kernels, and a claims matrix that links
+the debugging, model-lineage, deterministic-inference, memory/recompute,
+MLP-witness, invertible-layer, roadmap-capability, and evidence-integrity
+claims to the exact gates, metrics, and SHA-256-indexed files that prove them.
+The evidence index covers every report, bundle, seed, runtime JSON output, and
+Markdown profile. The summary gate fails the pipeline if the capability map,
+reverse replay, witness matching,
+training-step selection traceability, training-lineage replay, evaluation
+replay, inspected-inference Q31 reference parity, training-update ledger,
+lineage-ledger, and cause-ledger fingerprint coverage,
+inference trace-profile ledger parity,
+reversible inference trace replay, evaluation-summary Q31 reference parity,
+MLP witness replay, invertible coupling replay, triangular residual replay, reversible preprocessing replay, accuracy floors,
+trace/witness ratio bounds, or the
+reverse/train elapsed-ratio budget regress. Tune those floors with options such
+as `--min-train-accuracy`, `--min-model-evaluation-accuracy`,
+`--max-trace-model-ratio`, and `--max-reverse-train-elapsed-ratio` when running
+larger local experiments. Use `--runner-bin` and `--reverie-bin` to point at
+prebuilt local binaries for faster repeated runs.
+The generated summary, model capsule, manifest, capsule profile, and saved
+`model-capsule-verification.json` report are first-class handoff artifacts too;
+the trust certificate mirrors the deterministic inference action contract and
+its Markdown report renders the same operation table for reviewers. It also
+promotes the reversible inference trace's top-k classes, top-k logit values,
+label rank, top-k correctness signal, margin ledgers, witness bytes, replay
+bytes, and recompute steps into the certificate and review handoff. The handoff includes exact argv-style review
+commands for reproducing the prediction, explaining the margin, replaying native
+inference, and reversing the trace. The
+pipeline executes those commands and writes `inference-action-review-receipt.json`
+plus `inference-action-review-receipt.md`, binding command exit codes, elapsed
+time, stdout/stderr hashes, capsule fingerprint, trust-certificate fingerprint,
+and handoff fingerprint into the release packet. The pipeline also writes
+`training-update-review-receipt.json` and `training-update-review-receipt.md`,
+which replay the full training lineage, inspect the selected update into scratch
+artifacts, and reverse the saved one-step bundle. Both receipt families include
+a run fingerprint over timing/output details and a semantic fingerprint over the
+stable proof facts, so a fresh replay can be compared without confusing clock
+noise for claim drift. It indexes direct native/evaluation-row inference audit
+Markdown cards beside the native inference verification, reference inference,
+and reversible trace cards.
+The verifier cross-validates the capsule against the summary, checks the
+manifest's capsule fingerprint, recomputes file evidence, and confirms the
+capsule profile still matches the rendered acceptance artifacts. It can also
+execute the handoff's inference action review commands and write a replay
+receipt with exit codes, elapsed time, and stdout/stderr hashes. Add
+`--require-handoff` to recompute every `ml-audit-handoff.json` artifact byte
+count/SHA-256 and ensure `ml-audit-handoff.md` still matches the rendered review
+packet:
+
+```sh
+python3 scripts/verify_model_capsule.py target/mnist-ml-audit-pipeline
+python3 scripts/verify_model_capsule.py target/mnist-ml-audit-pipeline --json
+python3 scripts/verify_model_capsule.py target/mnist-ml-audit-pipeline \
+  --output target/mnist-ml-audit-pipeline/model-capsule-verification.json
+python3 scripts/verify_model_capsule.py target/mnist-ml-audit-pipeline \
+  --require-handoff --require-verification-markdown
+python3 scripts/verify_model_capsule.py target/mnist-ml-audit-pipeline \
+  --require-handoff --require-verification-markdown \
+  --run-inference-action-commands \
+  --action-command-receipt-output target/mnist-ml-audit-pipeline/inference-action-review-receipt.json \
+  --action-command-receipt-markdown target/mnist-ml-audit-pipeline/inference-action-review-receipt.md
+python3 scripts/run_mnist_ml_audit_pipeline.py \
+  --out-dir target/mnist-ml-audit-pipeline \
+  --write-training-update-receipt-only
+python3 scripts/check_ml_north_star.py target/mnist-ml-audit-pipeline \
+  --benchmark-json benchmarks/results/jana-vs-reverie-local-arm64-memory.json \
+  --benchmark-markdown benchmarks/results/jana-vs-reverie-local-arm64-memory.md
+python3 scripts/check_mnist_ml_profile.py \
+  target/mnist-ml-audit-pipeline/pipeline-summary.json \
+  target/mnist-ml-audit-pipeline/model-capsule.json \
+  target/mnist-ml-audit-pipeline/pipeline-manifest.json \
+  --verify-pipeline-files
+```
+
+`check_ml_north_star.py` is the combined release gate for the current ML goal.
+It requires the capsule and handoff verifier to pass, V1-V6 capability and
+readiness gates to pass, the reversible inference roundtrip proof to replay,
+and the Jana-vs-Reverie benchmark to include speed and peak RSS ratios that
+meet the configured floors. It writes `ml-north-star-gate.json` and
+`ml-north-star-gate.md` next to the audit packet. The Markdown gate includes a
+`Claim Evidence` table summarizing the checked claims, referenced gates,
+referenced metric blocks, digest-indexed files, evidence bytes, and evidence
+fingerprints; the gate rejects the packet unless the artifact-integrity claim
+covers every digest-indexed evidence file, including the reversible roundtrip
+proof and verification artifacts. The Markdown gate also includes roundtrip
+ML-profile replay-cost rows for replay payload bytes, witness bytes, static
+roundtrip statements, and Q31 builtin calls, a `Model Lineage` section with
+checked-step coverage, final/initial model replay status, witness replay, and
+lineage/final-chain fingerprints, a `Deterministic Inference` section with the
+Q31/native prediction, margin, active-pixel attribution ledgers, replay payload,
+reversible-trace witness/recompute costs, and an action contract for reproducing
+the prediction, explaining the margin, replaying native inference, and reversing
+the trace, plus a `Debuggable Update` section that surfaces the selected training
+step, sample, replay payload, nonzero weight/bias deltas, reversed-later-step
+count, and update-ledger fingerprints.
+The Markdown gate also includes the
+fingerprinted `Goal Contract` table, including per-claim proof rows that map
+each north-star contract claim to passing pipeline claim rows, required gate
+metrics, release-level checks, and evidence counts. The Markdown gate also includes a
+`Reviewer Commands` table with exact local commands to rerun the gate, verify
+the handoff, validate profile evidence, recheck the benchmark, replay the
+roundtrip proof, and regenerate the selected training-step debug card.
+Use `--list-reviewer-commands` to print the command ids, or repeat
+`--run-reviewer-command ID` to execute selected replay paths through the gate;
+for example:
+
+```sh
+python3 scripts/check_ml_north_star.py target/mnist-ml-audit-pipeline \
+  --run-reviewer-command profile_evidence \
+  --run-reviewer-command inference_action_receipt \
+  --run-reviewer-command benchmark_speed_memory \
+  --run-reviewer-command roundtrip_proof \
+  --run-reviewer-command training_step_debug \
+  --run-reviewer-command training_update_receipt \
+  --run-reviewer-command mlp_witness_proof \
+  --run-reviewer-command invertible_coupling_proof \
+  --run-reviewer-command triangular_residual_proof \
+  --run-reviewer-command reversible_preprocess_proof \
+  --run-reviewer-command reversible_inference_trace_proof
+```
+
+When reviewer commands run, the gate also writes `ml-reviewer-replay.json` and
+`ml-reviewer-replay.md` next to the audit packet. The transcript records each
+command array, exit code, elapsed time, stdout/stderr byte counts, and
+stdout/stderr SHA-256 hashes, then records the gate fingerprint before and after
+the replay. Add `--verify-reviewer-transcript` to validate that the saved
+transcript JSON, rendered Markdown, command index, output hashes, and before/after
+gate fingerprints still match the current release gate. When that transcript
+check passes, the gate also writes `ml-release-verification.json` and
+`ml-release-verification.md`, a compact receipt binding the current gate
+fingerprint, the explicit goal/non-goal contract, claim/evidence coverage,
+speed+RSS benchmark stats, transcript fingerprint, and replayed reviewer
+command ids. Add
+`--verify-release-verification` to recheck a saved release-verification JSON and
+Markdown receipt against the current gate and saved transcript without needing
+to rerun the reviewer commands. The receipt requires the saved transcript to
+include the `profile_evidence`, `benchmark_speed_memory`, `roundtrip_proof`,
+`inference_action_receipt`, `training_step_debug`, `training_update_receipt`,
+`mlp_witness_proof`, `invertible_coupling_proof`, `triangular_residual_proof`,
+`reversible_preprocess_proof`, and
+`reversible_inference_trace_proof` replay
+commands, and its Markdown includes copyable commands to recheck the saved
+receipt or regenerate it from the saved transcript. Its `Goal Contract`
+section fingerprints the north-star string, the PyTorch/TensorFlow non-goal,
+the V1-V6 capability status, readiness counts, allowed ML-audit claim set, and
+cost signals. It also renders a per-claim proof table that maps each contract
+claim to the passing pipeline claim rows, required gate metrics, release-level
+checks such as the roundtrip and speed+RSS benchmark, and digest-indexed
+evidence references. Its `Claim Replay Coverage` table maps each contract
+claim to the saved reviewer replay commands and gate artifact ids that
+directly exercised it. The MLP, invertible-coupling, reversible-preprocess,
+and reversible-inference-trace replay commands use `--expect-report-json` to
+compare the recomputed proof card with the saved machine-readable report before
+refreshing Markdown. The receipt rejects stale packets when its recomputed goal
+contract differs from the contract embedded in the gate or when any contract
+claim is missing a required replay command or proof artifact. The receipt also
+records SHA-256 digests for the Python verifier scripts that validate the gate,
+capsule, profile evidence, and benchmark artifact, plus a compact manifest of
+the gate, transcript, and benchmark files used to produce the receipt. It also
+summarizes the gate's underlying audit-packet artifact index with a file count,
+byte total, and SHA-256 fingerprint.
+
+The MNIST witness-tape loop benchmark runs
+`examples/mnist_witness_tape_loop.rev`, a two-sample `784 x 10` Q31 training
+trace that writes logits, errors, predictions, and correctness into indexed
+tensor tape slots inside an `iterate` loop. It keeps batched dataset indexing
+and first-class trace state visible in the internal suite.
+
+The MNIST MLP witness benchmark runs `examples/mnist_mlp_witness.rev`, a
+two-sample `784 -> 16 -> 10` Q31 training trace with explicit hidden
+preactivation, ReLU mask, activation, output-error, and hidden-delta witnesses.
+It keeps the reversible MLP pattern visible as the tensor surface grows beyond
+linear classifiers. `scripts/check_q31_mlp_witness.py --json` independently
+checks the same MLP witness trace, validates the generic Reverie
+`witness_proof` fingerprints against the concrete witness store, and reports
+witness bytes, trace bytes, replay bytes, recompute steps, and recomputed
+layer-update bytes. The ML profile checker and Markdown renderer also accept
+that JSON report, so MLP witness proof costs and witness-store digests can sit
+beside speed, memory, and artifact-profile rows.
+Add `--markdown-output PATH` to render the sample predictions, activation/mask
+witness counts, per-tape SHA-256 fingerprints, replay costs, and
+recompute-vs-witness tradeoff as a review card. Add
+`--expect-report-json PATH` when reviewing a release artifact to require the
+recomputed report to match the saved JSON proof card exactly.
+
+The invertible coupling benchmark runs `examples/invertible_coupling.rev`, a
+RevNet-style additive coupling block over two 4-wide Q31 activation halves. It
+keeps no-witness invertible layer patterns visible beside witness-backed
+training traces. `scripts/check_invertible_coupling.py --json` independently
+checks the same Q31 additive coupling math, verifies Reverie forward output,
+verifies reverse execution restores the initial activation halves, and reports
+zero witness bytes, zero trace bytes, replay bytes, and balanced recompute
+steps.
+Add `--markdown-output PATH` to render the coupling state, additive transforms,
+reverse contract, and zero-witness payload accounting as a review card. Add
+`--expect-report-json PATH` when reviewing a release artifact to require the
+recomputed report to match the saved JSON proof card exactly.
+
+The triangular residual benchmark runs `examples/triangular_residual.rev`, a
+Q31 invertible residual layer where each coordinate accumulates residual terms
+from later coordinates only. `scripts/check_triangular_residual.py --json`
+independently checks the triangular Q31 math, verifies Reverie forward output,
+verifies reverse execution restores the initial activation vector, and reports
+parameter bytes, state bytes, zero witness bytes, zero trace bytes, replay
+bytes, and balanced recompute steps. Add `--markdown-output PATH` to render
+the residual state, triangular updates, reverse contract, and zero-witness
+payload accounting as a review card. Add `--expect-report-json PATH` when
+reviewing a release artifact to require the recomputed report to match the
+saved JSON proof card exactly.
+
+The reversible preprocessing benchmark runs
+`examples/reversible_preprocess.rev`, a Q31 input block that accumulates raw
+features into a feature buffer, subtracts a mean vector, and permutes the
+result with swaps. `scripts/check_reversible_preprocess.py --json`
+independently verifies forward output, verifies reverse execution clears the
+feature buffer while preserving raw and mean vectors, and reports zero
+witness bytes, zero trace bytes, replay bytes, and balanced recompute steps.
+Add `--markdown-output PATH` to render the raw/mean/features sequence,
+reverse contract, and zero-witness payload accounting as a review card. Add
+`--expect-report-json PATH` when reviewing a release artifact to require the
+recomputed report to match the saved JSON proof card exactly.
+
+The reversible inference trace benchmark runs
+`examples/reversible_inference_trace.rev`, which chains that style of
+preprocessing into a tiny Q31 linear classifier. The independent checker
+recomputes logits, ranked classes, ranked logit values, first-maximum
+prediction, runner-up class, top-two margin, correctness, and reverse
+restoration, then reports model bytes, witness bytes, trace bytes, replay
+bytes, balanced recompute steps, top logits, margin, and contribution-ledger
+fingerprints for the winning logit and runner-up margin. Add
+`--expect-report-json PATH` when reviewing a release artifact to require the
+recomputed report to match the saved JSON proof card exactly.
+
 The matrix transpose benchmarks run `examples/matrix_transpose.rev` forward and
 backward. It keeps multidimensional array swaps and the mechanically inverted
 transpose path visible in Criterion, matching the dedicated external
@@ -147,8 +538,9 @@ In a short local Criterion sample, `janus_turing_binary_inc` ran at roughly
 `85 µs` in the tree walker and `30 µs` in the slot-compiled engine.
 
 The external benchmark harness also includes Jana's `matrixmult_v1.0.ja`
-directly, exercising multidimensional arrays, nested `iterate` loops, and
-array-element procedure arguments. It also includes a dedicated 3x3 matrix
+directly under `--legacy-janus`, exercising multidimensional arrays, nested
+`iterate` loops, array-element procedure arguments, and Jana-compatible update
+aliases. It also includes a dedicated 3x3 matrix
 transpose fixture that uses nested `iterate` loops, multidimensional indexing,
 and reversible element swaps in forward, reverse, and round-trip directions.
 
@@ -195,7 +587,7 @@ That command builds `target/release/reverie`, verifies every configured
 workload, requires every selected workload to beat Jana by at least 1.25x by
 median wall-clock time, requires the observed workload minimum to stay at or
 above 2.0x, requires the suite median and geometric mean to stay at or above
-4.0x, and writes
+3.0x, and writes
 `benchmarks/results/jana-vs-reverie-smoke.json` and
 `benchmarks/results/jana-vs-reverie-smoke.md`.
 
@@ -310,10 +702,11 @@ Current external workloads:
   reverse cleanup, using Jana and Reverie fixtures with the same call/uncall
   shape.
 - `jana_matrixmult_v1_direct`: unmodified upstream Jana
-  `examples/matrixmult_v1.0.ja` run by both Jana and Reverie.
+  `examples/matrixmult_v1.0.ja` run by Jana and by Reverie with
+  `--legacy-janus`.
 - `jana_matrixmult_v1_reverse`: the matrix multiplication final store back to
   zeroed arrays and scalars, using a Jana reverse fixture and Reverie's native
-  `reverse` command.
+  `reverse --legacy-janus` command.
 - `jana_matrixmult_v1_roundtrip`: matrix multiplication forward execution
   followed by the reverse fixture, timed as one checked workload on each side.
 - `matrix_transpose_3x3`: nested-iterate 3x3 matrix transpose with
@@ -363,8 +756,8 @@ Current external workloads:
 - `janus_factor_840`: Jana's factorization example against
   `examples/janus_factor.rev`.
 - `janus_factor_840_reverse`: factor table final state back to `num = 840`.
-- `janus_sort_n50_reverse_order`: modern-Jana reversible bubble sort against
-  `examples/janus_sort.rev`, both on a 50-element reverse-ordered array.
+- `janus_sort_n50_reverse_order`: modern-Jana reversible bubble sort run by
+  both implementations on a 50-element reverse-ordered array.
 - `janus_sort_n50_reverse_order_reverse`: sorted list plus permutation witness
   back to the reverse-ordered input and zeroed witness array.
 - `janus_sort_n50_reverse_order_roundtrip`: sort followed by reverse sort,

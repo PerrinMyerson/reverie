@@ -10,10 +10,19 @@ use thiserror::Error;
 
 mod compiled;
 
+const MAX_PACK_BITS: usize = 63;
+
 pub use compiled::{
-    CompiledProgram, execute_compiled, execute_compiled_backward, execute_compiled_io,
-    execute_compiled_io_backward,
+    CompiledProgram, execute_compiled, execute_compiled_backward,
+    execute_compiled_backward_with_options, execute_compiled_io, execute_compiled_io_backward,
+    execute_compiled_io_backward_with_options, execute_compiled_io_with_options,
+    execute_compiled_with_options,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ExecutionOptions {
+    pub allow_update_aliases: bool,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
@@ -282,6 +291,7 @@ fn default_value(dims: &[usize], ty: Option<&TypeExpr>) -> Result<Value, Runtime
     if let Some((len, rest)) = dims.split_first() {
         let element_ty = match ty {
             Some(TypeExpr::Array { element }) => Some(&element.node),
+            Some(TypeExpr::Witness { inner }) => Some(&inner.node),
             other => other,
         };
         return (0..*len)
@@ -293,6 +303,8 @@ fn default_value(dims: &[usize], ty: Option<&TypeExpr>) -> Result<Value, Runtime
     match ty {
         Some(TypeExpr::Stack) => Ok(Value::Stack(Vec::new())),
         Some(TypeExpr::Array { element }) => default_value(&[1], Some(&element.node)),
+        Some(TypeExpr::Tensor { element, shape }) => default_value(shape, Some(&element.node)),
+        Some(TypeExpr::Witness { inner }) => default_value(&[], Some(&inner.node)),
         Some(TypeExpr::Bool) => Ok(Value::Bool(false)),
         Some(TypeExpr::Int { .. }) | None => Ok(Value::Int(0)),
     }
@@ -414,8 +426,24 @@ pub fn execute(program: &Program, state: State) -> Result<State, RuntimeError> {
     execute_io(program, IoState::new(state, [])).map(IoState::into_store)
 }
 
-pub fn execute_io(program: &Program, mut state: IoState) -> Result<IoState, RuntimeError> {
-    let runtime = Runtime::new(program)?;
+pub fn execute_with_options(
+    program: &Program,
+    state: State,
+    options: ExecutionOptions,
+) -> Result<State, RuntimeError> {
+    execute_io_with_options(program, IoState::new(state, []), options).map(IoState::into_store)
+}
+
+pub fn execute_io(program: &Program, state: IoState) -> Result<IoState, RuntimeError> {
+    execute_io_with_options(program, state, ExecutionOptions::default())
+}
+
+pub fn execute_io_with_options(
+    program: &Program,
+    mut state: IoState,
+    options: ExecutionOptions,
+) -> Result<IoState, RuntimeError> {
+    let runtime = Runtime::new(program, options)?;
     initialize_globals(&program.globals, &mut state.store)?;
     let mut tapes = Tapes {
         input: &mut state.input,
@@ -430,9 +458,26 @@ pub fn execute_backward(program: &Program, state: State) -> Result<State, Runtim
     execute_io_backward(program, IoState::new(state, [])).map(IoState::into_store)
 }
 
+pub fn execute_backward_with_options(
+    program: &Program,
+    state: State,
+    options: ExecutionOptions,
+) -> Result<State, RuntimeError> {
+    execute_io_backward_with_options(program, IoState::new(state, []), options)
+        .map(IoState::into_store)
+}
+
 pub fn execute_io_backward(program: &Program, state: IoState) -> Result<IoState, RuntimeError> {
+    execute_io_backward_with_options(program, state, ExecutionOptions::default())
+}
+
+pub fn execute_io_backward_with_options(
+    program: &Program,
+    state: IoState,
+    options: ExecutionOptions,
+) -> Result<IoState, RuntimeError> {
     let inverse = reverie_core::invert_program(program);
-    execute_io(&inverse, state)
+    execute_io_with_options(&inverse, state, options)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -470,8 +515,16 @@ pub fn build_timeline(program: &Program, state: State) -> Result<Timeline, Runti
     build_timeline_io(program, IoState::new(state, []))
 }
 
-pub fn build_timeline_io(program: &Program, mut state: IoState) -> Result<Timeline, RuntimeError> {
-    let runtime = Runtime::new(program)?;
+pub fn build_timeline_io(program: &Program, state: IoState) -> Result<Timeline, RuntimeError> {
+    build_timeline_io_with_options(program, state, ExecutionOptions::default())
+}
+
+pub fn build_timeline_io_with_options(
+    program: &Program,
+    mut state: IoState,
+    options: ExecutionOptions,
+) -> Result<Timeline, RuntimeError> {
+    let runtime = Runtime::new(program, options)?;
     initialize_globals(&program.globals, &mut state.store)?;
     let mut builder = TimelineBuilder::new(state.store.clone());
     let mut tapes = Tapes {
@@ -518,6 +571,7 @@ impl TimelineBuilder {
 struct Runtime<'a> {
     globals: &'a [GlobalDecl],
     procedures: BTreeMap<&'a str, &'a Proc>,
+    options: ExecutionOptions,
 }
 
 struct Tapes<'a> {
@@ -527,7 +581,7 @@ struct Tapes<'a> {
 }
 
 impl<'a> Runtime<'a> {
-    fn new(program: &'a Program) -> Result<Self, RuntimeError> {
+    fn new(program: &'a Program, options: ExecutionOptions) -> Result<Self, RuntimeError> {
         let mut procedures = BTreeMap::new();
         for procedure in &program.procedures {
             if procedures
@@ -544,6 +598,7 @@ impl<'a> Runtime<'a> {
         Ok(Self {
             globals: &program.globals,
             procedures,
+            options,
         })
     }
 
@@ -577,7 +632,9 @@ impl<'a> Runtime<'a> {
                 Ok(state)
             }
             Stmt::Update { target, op, expr } => {
-                ensure_update_rhs_does_not_read_target(target, expr, &state)?;
+                if !self.options.allow_update_aliases {
+                    ensure_update_rhs_does_not_read_target(target, expr, &state)?;
+                }
                 let next = updated_value(target, *op, expr, &state)?;
                 assign_place(target, &mut state, next)?;
                 Ok(state)
@@ -813,7 +870,9 @@ impl<'a> Runtime<'a> {
                 Ok(state)
             }
             Stmt::Update { target, op, expr } => {
-                ensure_update_rhs_does_not_read_target(target, expr, &state)?;
+                if !self.options.allow_update_aliases {
+                    ensure_update_rhs_does_not_read_target(target, expr, &state)?;
+                }
                 let next = updated_value(target, *op, expr, &state)?;
                 assign_place(target, &mut state, next)?;
                 timeline.push(
@@ -1591,6 +1650,7 @@ fn validate_declared_value(
     if let Some((len, rest)) = dims.split_first() {
         let element_ty = match ty {
             Some(TypeExpr::Array { element }) => Some(&element.node),
+            Some(TypeExpr::Witness { inner }) => Some(&inner.node),
             other => other,
         };
         match value {
@@ -1625,6 +1685,12 @@ fn validate_declared_value(
             }
             validate_rectangular_declared_array(name, values)?;
             Ok(())
+        }
+        (Some(TypeExpr::Tensor { element, shape }), value) => {
+            validate_declared_value(name, shape, Some(&element.node), value)
+        }
+        (Some(TypeExpr::Witness { inner }), value) => {
+            validate_declared_value(name, &[], Some(&inner.node), value)
         }
         (Some(TypeExpr::Bool), other) => Err(RuntimeError::new(format!(
             "declaration `{name}` expected bool, found {other}"
@@ -1917,6 +1983,13 @@ fn eval(expr: &SpannedExpr, state: &State) -> Result<Value, RuntimeError> {
         Expr::Size { target } => eval_size(target, expr.span.clone(), state),
         Expr::Unary { op, expr } => eval_unary(*op, expr, state),
         Expr::Binary { op, left, right } => eval_binary(*op, left, right, state),
+        Expr::Call { name, args } => {
+            let values = args
+                .iter()
+                .map(|arg| eval(arg, state))
+                .collect::<Result<Vec<_>, _>>()?;
+            eval_tensor_builtin_values(name, values, expr.span.clone())
+        }
     }
 }
 
@@ -2043,6 +2116,892 @@ fn fixed_mul_q31(left: i64, right: i64) -> i64 {
     ((i128::from(left) * i128::from(right)) >> 31) as i64
 }
 
+pub(crate) fn eval_tensor_builtin_values(
+    name: &str,
+    args: Vec<Value>,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    match name {
+        "matmul" | "matmul_q31" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            tensor_matmul(&args[0], &args[1], name == "matmul_q31", span)
+        }
+        "matvec" | "matvec_q31" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            tensor_matvec(&args[0], &args[1], name == "matvec_q31", span)
+        }
+        "vecmat" | "vecmat_q31" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            tensor_vecmat(&args[0], &args[1], name == "vecmat_q31", span)
+        }
+        "dot" | "dot_q31" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            tensor_dot(&args[0], &args[1], name == "dot_q31", span)
+        }
+        "hadamard" | "hadamard_q31" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            tensor_hadamard(&args[0], &args[1], name == "hadamard_q31", span)
+        }
+        "outer" | "outer_q31" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            tensor_outer(&args[0], &args[1], name == "outer_q31", span)
+        }
+        "scale" | "scale_q31" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            let scalar = expect_scalar_int_value(&args[1], name, 2, span.clone())?;
+            tensor_scale(&args[0], scalar, name == "scale_q31", span)
+        }
+        "clamp" | "clamp_q31" => {
+            expect_tensor_arg_count(name, &args, 3, span.clone())?;
+            let lower = expect_scalar_int_value(&args[1], name, 2, span.clone())?;
+            let upper = expect_scalar_int_value(&args[2], name, 3, span.clone())?;
+            tensor_clamp(&args[0], lower, upper, name, span)
+        }
+        "normalize_q31" => {
+            expect_tensor_arg_count(name, &args, 3, span.clone())?;
+            tensor_normalize_q31(&args[0], &args[1], &args[2], span)
+        }
+        "transpose" => {
+            expect_tensor_arg_count(name, &args, 1, span.clone())?;
+            tensor_transpose(&args[0], span)
+        }
+        "sum" => {
+            expect_tensor_arg_count(name, &args, 1, span.clone())?;
+            Ok(Value::Int(tensor_sum(&args[0], span)?))
+        }
+        "relu" => {
+            expect_tensor_arg_count(name, &args, 1, span.clone())?;
+            tensor_relu(&args[0], span)
+        }
+        "relu_mask_q31" => {
+            expect_tensor_arg_count(name, &args, 1, span.clone())?;
+            tensor_relu_mask_q31(&args[0], span)
+        }
+        "argmax" => {
+            expect_tensor_arg_count(name, &args, 1, span.clone())?;
+            Ok(Value::Int(tensor_argmax(&args[0], span)?))
+        }
+        "runner_up" => {
+            expect_tensor_arg_count(name, &args, 1, span.clone())?;
+            Ok(Value::Int(tensor_runner_up(&args[0], span)?))
+        }
+        "top2_margin" => {
+            expect_tensor_arg_count(name, &args, 1, span.clone())?;
+            Ok(Value::Int(tensor_top2_margin(&args[0], span)?))
+        }
+        "top_k_indices" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            let k = expect_positive_usize_value(&args[1], name, 2, span.clone())?;
+            tensor_top_k_indices(&args[0], k, span)
+        }
+        "top_k_values" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            let k = expect_positive_usize_value(&args[1], name, 2, span.clone())?;
+            tensor_top_k_values(&args[0], k, span)
+        }
+        "top_k_contains" => {
+            expect_tensor_arg_count(name, &args, 3, span.clone())?;
+            let label = expect_scalar_int_value(&args[1], name, 2, span.clone())?;
+            let k = expect_positive_usize_value(&args[2], name, 3, span.clone())?;
+            Ok(Value::Int(i64::from(tensor_top_k_contains(
+                &args[0], label, k, span,
+            )?)))
+        }
+        "rank_of" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            let label = expect_scalar_int_value(&args[1], name, 2, span.clone())?;
+            Ok(Value::Int(tensor_rank_of(&args[0], label, span)?))
+        }
+        "argmax_eq" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            let label = expect_scalar_int_value(&args[1], name, 2, span.clone())?;
+            let prediction = tensor_argmax(&args[0], span)?;
+            Ok(Value::Int(i64::from(prediction == label)))
+        }
+        "one_hot" | "one_hot_q31" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            let label = expect_scalar_int_value(&args[0], name, 1, span.clone())?;
+            let classes = expect_positive_usize_value(&args[1], name, 2, span.clone())?;
+            tensor_one_hot(label, classes, name == "one_hot_q31", span)
+        }
+        "pack_bits" => {
+            expect_tensor_arg_count(name, &args, 1, span.clone())?;
+            tensor_pack_bits(&args[0], span)
+        }
+        "unpack_bits" => {
+            expect_tensor_arg_count(name, &args, 2, span.clone())?;
+            let packed = expect_scalar_int_value(&args[0], name, 1, span.clone())?;
+            let width = expect_pack_width_value(&args[1], name, 2, span.clone())?;
+            tensor_unpack_bits(packed, width, span)
+        }
+        _ => Err(RuntimeError::at(
+            format!("unknown tensor builtin `{name}`"),
+            span,
+        )),
+    }
+}
+
+fn update_add_sub_value(
+    current: &Value,
+    rhs: &Value,
+    op: UpdateOp,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    match (current, rhs) {
+        (Value::Int(current), Value::Int(rhs)) => Ok(Value::Int(match op {
+            UpdateOp::Add => current.wrapping_add(*rhs),
+            UpdateOp::Sub => current.wrapping_sub(*rhs),
+            UpdateOp::Xor => unreachable!("xor update handled separately"),
+        })),
+        (Value::Array(current), Value::Array(rhs)) if current.len() == rhs.len() => current
+            .iter()
+            .zip(rhs)
+            .map(|(current, rhs)| update_add_sub_value(current, rhs, op, span.clone()))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Value::Array),
+        (Value::Array(current), Value::Array(rhs)) => Err(RuntimeError::at(
+            format!(
+                "tensor update shape mismatch: target length {}, right-hand side length {}",
+                current.len(),
+                rhs.len()
+            ),
+            span,
+        )),
+        (current, rhs) => Err(RuntimeError::at(
+            format!(
+                "expected matching int or int tensor operands for add/sub update, found {current} and {rhs}"
+            ),
+            span,
+        )),
+    }
+}
+
+fn expect_tensor_arg_count(
+    name: &str,
+    args: &[Value],
+    expected: usize,
+    span: Range<usize>,
+) -> Result<(), RuntimeError> {
+    if args.len() == expected {
+        return Ok(());
+    }
+
+    Err(RuntimeError::at(
+        format!(
+            "{name} expects {expected} argument(s), found {}",
+            args.len()
+        ),
+        span,
+    ))
+}
+
+fn tensor_matmul(
+    left: &Value,
+    right: &Value,
+    q31: bool,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    let left = expect_matrix(left, "matmul left argument", span.clone())?;
+    let right = expect_matrix(right, "matmul right argument", span.clone())?;
+    let left_cols = left.first().map_or(0, Vec::len);
+    let right_rows = right.len();
+    if left_cols != right_rows {
+        return Err(RuntimeError::at(
+            format!(
+                "matmul inner dimension mismatch: left has {left_cols}, right has {right_rows}"
+            ),
+            span,
+        ));
+    }
+    let right_cols = right.first().map_or(0, Vec::len);
+    let right_columns = matrix_columns(&right);
+    let mut rows = Vec::with_capacity(left.len());
+    for left_row in &left {
+        let mut out_row = Vec::with_capacity(right_cols);
+        for right_column in &right_columns {
+            let mut acc = 0_i64;
+            for (left_value, right_value) in left_row.iter().zip(right_column) {
+                let product = if q31 {
+                    fixed_mul_q31(*left_value, *right_value)
+                } else {
+                    left_value.wrapping_mul(*right_value)
+                };
+                acc = acc.wrapping_add(product);
+            }
+            out_row.push(Value::Int(acc));
+        }
+        rows.push(Value::Array(out_row));
+    }
+    Ok(Value::Array(rows))
+}
+
+fn tensor_matvec(
+    matrix: &Value,
+    vector: &Value,
+    q31: bool,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    let matrix = expect_matrix(matrix, "matvec matrix argument", span.clone())?;
+    let vector = expect_vector(vector, "matvec vector argument", span.clone())?;
+    let cols = matrix.first().map_or(0, Vec::len);
+    if cols != vector.len() {
+        return Err(RuntimeError::at(
+            format!(
+                "matvec inner dimension mismatch: matrix has {cols}, vector has {}",
+                vector.len()
+            ),
+            span,
+        ));
+    }
+    matrix
+        .iter()
+        .map(|row| tensor_dot_values(row, &vector, q31).map(Value::Int))
+        .collect::<Result<Vec<_>, _>>()
+        .map(Value::Array)
+}
+
+fn tensor_vecmat(
+    vector: &Value,
+    matrix: &Value,
+    q31: bool,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    let vector = expect_vector(vector, "vecmat vector argument", span.clone())?;
+    let matrix = expect_matrix(matrix, "vecmat matrix argument", span.clone())?;
+    if vector.len() != matrix.len() {
+        return Err(RuntimeError::at(
+            format!(
+                "vecmat inner dimension mismatch: vector has {}, matrix has {}",
+                vector.len(),
+                matrix.len()
+            ),
+            span,
+        ));
+    }
+    let cols = matrix.first().map_or(0, Vec::len);
+    let columns = matrix_columns(&matrix);
+    let mut out = Vec::with_capacity(cols);
+    for column in &columns {
+        let mut acc = 0_i64;
+        for (vector_value, matrix_value) in vector.iter().zip(column) {
+            let product = if q31 {
+                fixed_mul_q31(*vector_value, *matrix_value)
+            } else {
+                vector_value.wrapping_mul(*matrix_value)
+            };
+            acc = acc.wrapping_add(product);
+        }
+        out.push(Value::Int(acc));
+    }
+    Ok(Value::Array(out))
+}
+
+fn matrix_columns(matrix: &[Vec<i64>]) -> Vec<Vec<i64>> {
+    let cols = matrix.first().map_or(0, Vec::len);
+    let mut columns = (0..cols)
+        .map(|_| Vec::with_capacity(matrix.len()))
+        .collect::<Vec<_>>();
+    for row in matrix {
+        for (col, value) in row.iter().enumerate() {
+            columns[col].push(*value);
+        }
+    }
+    columns
+}
+
+fn tensor_dot(
+    left: &Value,
+    right: &Value,
+    q31: bool,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    let left = expect_vector(left, "dot left argument", span.clone())?;
+    let right = expect_vector(right, "dot right argument", span.clone())?;
+    if left.len() != right.len() {
+        return Err(RuntimeError::at(
+            format!(
+                "dot length mismatch: left has {}, right has {}",
+                left.len(),
+                right.len()
+            ),
+            span,
+        ));
+    }
+    tensor_dot_values(&left, &right, q31).map(Value::Int)
+}
+
+fn tensor_dot_values(left: &[i64], right: &[i64], q31: bool) -> Result<i64, RuntimeError> {
+    let mut acc = 0_i64;
+    for (left, right) in left.iter().zip(right.iter()) {
+        let product = if q31 {
+            fixed_mul_q31(*left, *right)
+        } else {
+            left.wrapping_mul(*right)
+        };
+        acc = acc.wrapping_add(product);
+    }
+    Ok(acc)
+}
+
+fn tensor_hadamard(
+    left: &Value,
+    right: &Value,
+    q31: bool,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    match (left, right) {
+        (Value::Int(left), Value::Int(right)) => Ok(Value::Int(if q31 {
+            fixed_mul_q31(*left, *right)
+        } else {
+            left.wrapping_mul(*right)
+        })),
+        (Value::Array(left), Value::Array(right)) if left.len() == right.len() => left
+            .iter()
+            .zip(right)
+            .map(|(left, right)| tensor_hadamard(left, right, q31, span.clone()))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Value::Array),
+        (Value::Array(left), Value::Array(right)) => Err(RuntimeError::at(
+            format!(
+                "hadamard shape mismatch: left length {}, right length {}",
+                left.len(),
+                right.len()
+            ),
+            span,
+        )),
+        (left, right) => Err(RuntimeError::at(
+            format!("expected matching int tensor operands, found {left} and {right}"),
+            span,
+        )),
+    }
+}
+
+fn tensor_outer(
+    left: &Value,
+    right: &Value,
+    q31: bool,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    let left = expect_vector(left, "outer left argument", span.clone())?;
+    let right = expect_vector(right, "outer right argument", span)?;
+    let mut rows = Vec::with_capacity(left.len());
+    for left_value in &left {
+        let mut row = Vec::with_capacity(right.len());
+        for right_value in &right {
+            row.push(Value::Int(if q31 {
+                fixed_mul_q31(*left_value, *right_value)
+            } else {
+                left_value.wrapping_mul(*right_value)
+            }));
+        }
+        rows.push(Value::Array(row));
+    }
+    Ok(Value::Array(rows))
+}
+
+fn tensor_scale(
+    value: &Value,
+    scalar: i64,
+    q31: bool,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    match value {
+        Value::Int(value) => Ok(Value::Int(if q31 {
+            fixed_mul_q31(*value, scalar)
+        } else {
+            value.wrapping_mul(scalar)
+        })),
+        Value::Array(values) => values
+            .iter()
+            .map(|value| tensor_scale(value, scalar, q31, span.clone()))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Value::Array),
+        other => Err(RuntimeError::at(
+            format!("expected int tensor, found {other}"),
+            span,
+        )),
+    }
+}
+
+fn tensor_clamp(
+    value: &Value,
+    lower: i64,
+    upper: i64,
+    name: &str,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    if lower > upper {
+        return Err(RuntimeError::at(
+            format!("{name} lower bound {lower} exceeds upper bound {upper}"),
+            span,
+        ));
+    }
+    match value {
+        Value::Int(value) => Ok(Value::Int((*value).clamp(lower, upper))),
+        Value::Array(values) => values
+            .iter()
+            .map(|value| tensor_clamp(value, lower, upper, name, span.clone()))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Value::Array),
+        other => Err(RuntimeError::at(
+            format!("expected int tensor, found {other}"),
+            span,
+        )),
+    }
+}
+
+fn tensor_normalize_q31(
+    value: &Value,
+    mean: &Value,
+    inv_scale: &Value,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    match (value, mean, inv_scale) {
+        (Value::Int(value), Value::Int(mean), Value::Int(inv_scale)) => Ok(Value::Int(
+            fixed_mul_q31(value.wrapping_sub(*mean), *inv_scale),
+        )),
+        (Value::Array(values), Value::Array(means), Value::Array(inv_scales))
+            if values.len() == means.len() && values.len() == inv_scales.len() =>
+        {
+            values
+                .iter()
+                .zip(means)
+                .zip(inv_scales)
+                .map(|((value, mean), inv_scale)| {
+                    tensor_normalize_q31(value, mean, inv_scale, span.clone())
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map(Value::Array)
+        }
+        (Value::Array(values), Value::Array(means), Value::Array(inv_scales)) => {
+            Err(RuntimeError::at(
+                format!(
+                    "normalize_q31 shape mismatch: value length {}, mean length {}, inverse-scale length {}",
+                    values.len(),
+                    means.len(),
+                    inv_scales.len()
+                ),
+                span,
+            ))
+        }
+        (value, mean, inv_scale) => Err(RuntimeError::at(
+            format!(
+                "expected matching int tensor operands for normalize_q31, found {value}, {mean}, and {inv_scale}"
+            ),
+            span,
+        )),
+    }
+}
+
+fn tensor_transpose(value: &Value, span: Range<usize>) -> Result<Value, RuntimeError> {
+    let matrix = expect_matrix(value, "transpose argument", span)?;
+    let rows = matrix.len();
+    let cols = matrix.first().map_or(0, Vec::len);
+    let mut out = Vec::with_capacity(cols);
+    for col in 0..cols {
+        let mut out_row = Vec::with_capacity(rows);
+        for row in &matrix {
+            out_row.push(Value::Int(row[col]));
+        }
+        out.push(Value::Array(out_row));
+    }
+    Ok(Value::Array(out))
+}
+
+fn tensor_sum(value: &Value, span: Range<usize>) -> Result<i64, RuntimeError> {
+    match value {
+        Value::Int(value) => Ok(*value),
+        Value::Array(values) => {
+            let mut acc = 0_i64;
+            for value in values {
+                acc = acc.wrapping_add(tensor_sum(value, span.clone())?);
+            }
+            Ok(acc)
+        }
+        other => Err(RuntimeError::at(
+            format!("expected int tensor, found {other}"),
+            span,
+        )),
+    }
+}
+
+fn tensor_relu(value: &Value, span: Range<usize>) -> Result<Value, RuntimeError> {
+    match value {
+        Value::Int(value) => Ok(Value::Int((*value).max(0))),
+        Value::Array(values) => values
+            .iter()
+            .map(|value| tensor_relu(value, span.clone()))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Value::Array),
+        other => Err(RuntimeError::at(
+            format!("expected int tensor, found {other}"),
+            span,
+        )),
+    }
+}
+
+fn tensor_relu_mask_q31(value: &Value, span: Range<usize>) -> Result<Value, RuntimeError> {
+    match value {
+        Value::Int(value) => Ok(Value::Int(if *value > 0 { 1_i64 << 31 } else { 0 })),
+        Value::Array(values) => values
+            .iter()
+            .map(|value| tensor_relu_mask_q31(value, span.clone()))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Value::Array),
+        other => Err(RuntimeError::at(
+            format!("expected int tensor, found {other}"),
+            span,
+        )),
+    }
+}
+
+fn tensor_argmax(value: &Value, span: Range<usize>) -> Result<i64, RuntimeError> {
+    let mut values = Vec::new();
+    collect_tensor_ints(value, "argmax argument", span.clone(), &mut values)?;
+    let Some((first, rest)) = values.split_first() else {
+        return Err(RuntimeError::at("argmax expected a non-empty tensor", span));
+    };
+    let mut best_index = 0_usize;
+    let mut best_value = *first;
+    for (offset, value) in rest.iter().enumerate() {
+        if *value > best_value {
+            best_value = *value;
+            best_index = offset + 1;
+        }
+    }
+    i64::try_from(best_index)
+        .map_err(|_| RuntimeError::at("argmax index exceeds i64", span.clone()))
+}
+
+fn tensor_runner_up(value: &Value, span: Range<usize>) -> Result<i64, RuntimeError> {
+    let (_, (runner_up_index, _)) = tensor_top2(value, "runner_up", span.clone())?;
+    i64::try_from(runner_up_index)
+        .map_err(|_| RuntimeError::at("runner_up index exceeds i64", span.clone()))
+}
+
+fn tensor_top2_margin(value: &Value, span: Range<usize>) -> Result<i64, RuntimeError> {
+    let ((_, best_value), (_, runner_up_value)) = tensor_top2(value, "top2_margin", span)?;
+    Ok(best_value.wrapping_sub(runner_up_value))
+}
+
+type TensorRankEntry = (usize, i64);
+type TensorTop2 = (TensorRankEntry, TensorRankEntry);
+
+fn tensor_top2(value: &Value, name: &str, span: Range<usize>) -> Result<TensorTop2, RuntimeError> {
+    let ranked = tensor_ranked_entries(value, name, span.clone())?;
+    if ranked.len() < 2 {
+        return Err(RuntimeError::at(
+            format!("{name} expected a tensor with at least two entries"),
+            span,
+        ));
+    }
+    Ok((ranked[0], ranked[1]))
+}
+
+fn tensor_top_k_indices(
+    value: &Value,
+    k: usize,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    let ranked = tensor_top_k(value, k, "top_k_indices", span.clone())?;
+    Ok(Value::Array(
+        ranked
+            .into_iter()
+            .map(|(index, _)| {
+                i64::try_from(index)
+                    .map(Value::Int)
+                    .map_err(|_| RuntimeError::at("top_k_indices index exceeds i64", span.clone()))
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    ))
+}
+
+fn tensor_top_k_values(value: &Value, k: usize, span: Range<usize>) -> Result<Value, RuntimeError> {
+    let ranked = tensor_top_k(value, k, "top_k_values", span)?;
+    Ok(Value::Array(
+        ranked
+            .into_iter()
+            .map(|(_, value)| Value::Int(value))
+            .collect(),
+    ))
+}
+
+fn tensor_top_k_contains(
+    value: &Value,
+    label: i64,
+    k: usize,
+    span: Range<usize>,
+) -> Result<bool, RuntimeError> {
+    let Ok(label) = usize::try_from(label) else {
+        return Ok(false);
+    };
+    Ok(tensor_top_k(value, k, "top_k_contains", span)?
+        .into_iter()
+        .any(|(index, _)| index == label))
+}
+
+fn tensor_rank_of(value: &Value, label: i64, span: Range<usize>) -> Result<i64, RuntimeError> {
+    let Ok(label) = usize::try_from(label) else {
+        return Ok(0);
+    };
+    for (rank, (index, _)) in tensor_ranked_entries(value, "rank_of", span.clone())?
+        .into_iter()
+        .enumerate()
+    {
+        if index == label {
+            return i64::try_from(rank + 1)
+                .map_err(|_| RuntimeError::at("rank_of rank exceeds i64", span.clone()));
+        }
+    }
+    Ok(0)
+}
+
+fn tensor_top_k(
+    value: &Value,
+    k: usize,
+    name: &str,
+    span: Range<usize>,
+) -> Result<Vec<(usize, i64)>, RuntimeError> {
+    let ranked = tensor_ranked_entries(value, name, span.clone())?;
+    if k > ranked.len() {
+        return Err(RuntimeError::at(
+            format!(
+                "{name} expected K <= tensor entries {}, found {k}",
+                ranked.len()
+            ),
+            span,
+        ));
+    }
+    Ok(ranked.into_iter().take(k).collect())
+}
+
+fn tensor_ranked_entries(
+    value: &Value,
+    name: &str,
+    span: Range<usize>,
+) -> Result<Vec<(usize, i64)>, RuntimeError> {
+    let mut values = Vec::new();
+    collect_tensor_ints(
+        value,
+        &format!("{name} argument"),
+        span.clone(),
+        &mut values,
+    )?;
+    let mut ranked = values.into_iter().enumerate().collect::<Vec<_>>();
+    ranked.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
+    Ok(ranked)
+}
+
+fn tensor_one_hot(
+    label: i64,
+    classes: usize,
+    q31: bool,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    let Ok(label) = usize::try_from(label) else {
+        return Err(RuntimeError::at("one_hot label must be non-negative", span));
+    };
+    if label >= classes {
+        return Err(RuntimeError::at(
+            format!("one_hot label {label} out of range for {classes} classes"),
+            span,
+        ));
+    }
+    let high = if q31 { 1_i64 << 31 } else { 1 };
+    Ok(Value::Array(
+        (0..classes)
+            .map(|index| Value::Int(if index == label { high } else { 0 }))
+            .collect(),
+    ))
+}
+
+fn tensor_pack_bits(value: &Value, span: Range<usize>) -> Result<Value, RuntimeError> {
+    let bits = expect_vector(value, "pack_bits argument", span.clone())?;
+    if bits.len() > MAX_PACK_BITS {
+        return Err(RuntimeError::at(
+            format!(
+                "pack_bits supports at most {MAX_PACK_BITS} bits, found {}",
+                bits.len()
+            ),
+            span,
+        ));
+    }
+
+    let mut packed = 0_i64;
+    for (index, bit) in bits.iter().enumerate() {
+        match *bit {
+            0 => {}
+            1 => packed |= 1_i64 << index,
+            other => {
+                return Err(RuntimeError::at(
+                    format!("pack_bits expected bit value 0 or 1, found {other} at index {index}"),
+                    span,
+                ));
+            }
+        }
+    }
+    Ok(Value::Int(packed))
+}
+
+fn tensor_unpack_bits(
+    packed: i64,
+    width: usize,
+    span: Range<usize>,
+) -> Result<Value, RuntimeError> {
+    if packed < 0 {
+        return Err(RuntimeError::at(
+            format!("unpack_bits expected a non-negative packed value, found {packed}"),
+            span,
+        ));
+    }
+    let max_value = (1_i128 << width) - 1;
+    if i128::from(packed) > max_value {
+        return Err(RuntimeError::at(
+            format!("unpack_bits value {packed} does not fit in {width} bit(s)"),
+            span,
+        ));
+    }
+
+    Ok(Value::Array(
+        (0..width)
+            .map(|index| Value::Int((packed >> index) & 1))
+            .collect(),
+    ))
+}
+
+fn collect_tensor_ints(
+    value: &Value,
+    context: &str,
+    span: Range<usize>,
+    out: &mut Vec<i64>,
+) -> Result<(), RuntimeError> {
+    match value {
+        Value::Int(value) => {
+            out.push(*value);
+            Ok(())
+        }
+        Value::Array(values) => {
+            for value in values {
+                collect_tensor_ints(value, context, span.clone(), out)?;
+            }
+            Ok(())
+        }
+        other => Err(RuntimeError::at(
+            format!("{context} expected int tensor, found {other}"),
+            span,
+        )),
+    }
+}
+
+fn expect_scalar_int_value(
+    value: &Value,
+    builtin: &str,
+    index: usize,
+    span: Range<usize>,
+) -> Result<i64, RuntimeError> {
+    match value {
+        Value::Int(value) => Ok(*value),
+        other => Err(RuntimeError::at(
+            format!("{builtin} argument {index} expected int, found {other}"),
+            span,
+        )),
+    }
+}
+
+fn expect_positive_usize_value(
+    value: &Value,
+    builtin: &str,
+    index: usize,
+    span: Range<usize>,
+) -> Result<usize, RuntimeError> {
+    let value = expect_scalar_int_value(value, builtin, index, span.clone())?;
+    let Ok(value) = usize::try_from(value) else {
+        return Err(RuntimeError::at(
+            format!("{builtin} argument {index} must be positive, found {value}"),
+            span,
+        ));
+    };
+    if value == 0 {
+        return Err(RuntimeError::at(
+            format!("{builtin} argument {index} must be positive"),
+            span,
+        ));
+    }
+    Ok(value)
+}
+
+fn expect_pack_width_value(
+    value: &Value,
+    builtin: &str,
+    index: usize,
+    span: Range<usize>,
+) -> Result<usize, RuntimeError> {
+    let width = expect_positive_usize_value(value, builtin, index, span.clone())?;
+    if width > MAX_PACK_BITS {
+        return Err(RuntimeError::at(
+            format!("{builtin} supports at most {MAX_PACK_BITS} bits, found {width}"),
+            span,
+        ));
+    }
+    Ok(width)
+}
+
+fn expect_matrix(
+    value: &Value,
+    context: &str,
+    span: Range<usize>,
+) -> Result<Vec<Vec<i64>>, RuntimeError> {
+    let Value::Array(rows) = value else {
+        return Err(RuntimeError::at(
+            format!("{context} expected rank-2 int tensor, found {value}"),
+            span,
+        ));
+    };
+    let mut matrix = Vec::with_capacity(rows.len());
+    let mut expected_cols = None;
+    for row in rows {
+        let row = expect_vector(row, context, span.clone())?;
+        if let Some(expected_cols) = expected_cols {
+            if row.len() != expected_cols {
+                return Err(RuntimeError::at(
+                    format!(
+                        "{context} has ragged rows: expected length {expected_cols}, found {}",
+                        row.len()
+                    ),
+                    span,
+                ));
+            }
+        } else {
+            expected_cols = Some(row.len());
+        }
+        matrix.push(row);
+    }
+    Ok(matrix)
+}
+
+fn expect_vector(
+    value: &Value,
+    context: &str,
+    span: Range<usize>,
+) -> Result<Vec<i64>, RuntimeError> {
+    let Value::Array(values) = value else {
+        return Err(RuntimeError::at(
+            format!("{context} expected rank-1 int tensor, found {value}"),
+            span,
+        ));
+    };
+    values
+        .iter()
+        .map(|value| match value {
+            Value::Int(value) => Ok(*value),
+            other => Err(RuntimeError::at(
+                format!("{context} expected int elements, found {other}"),
+                span.clone(),
+            )),
+        })
+        .collect()
+}
+
 fn eval_bitwise(
     left: &SpannedExpr,
     right: &SpannedExpr,
@@ -2113,14 +3072,14 @@ fn updated_value(
 ) -> Result<Value, RuntimeError> {
     match op {
         UpdateOp::Add => {
-            let current = expect_place_int(target, state)?;
-            let rhs = eval_int(expr, state)?;
-            Ok(Value::Int(current.wrapping_add(rhs)))
+            let current = eval_place(target, state)?;
+            let rhs = eval(expr, state)?;
+            update_add_sub_value(&current, &rhs, UpdateOp::Add, expr.span.clone())
         }
         UpdateOp::Sub => {
-            let current = expect_place_int(target, state)?;
-            let rhs = eval_int(expr, state)?;
-            Ok(Value::Int(current.wrapping_sub(rhs)))
+            let current = eval_place(target, state)?;
+            let rhs = eval(expr, state)?;
+            update_add_sub_value(&current, &rhs, UpdateOp::Sub, expr.span.clone())
         }
         UpdateOp::Xor => match (eval_place(target, state)?, eval(expr, state)?) {
             (Value::Int(current), Value::Int(rhs)) => Ok(Value::Int(current ^ rhs)),
@@ -2275,6 +3234,11 @@ fn collect_read_places(
         Expr::Binary { left, right, .. } => {
             collect_read_places(left, state, reads)?;
             collect_read_places(right, state, reads)?;
+        }
+        Expr::Call { args, .. } => {
+            for arg in args {
+                collect_read_places(arg, state, reads)?;
+            }
         }
     }
 
@@ -2452,6 +3416,14 @@ loop
   skip
 until i == n
 "#;
+
+    fn vector(values: &[i64]) -> Value {
+        Value::Array(values.iter().copied().map(Value::Int).collect())
+    }
+
+    fn matrix(rows: &[&[i64]]) -> Value {
+        Value::Array(rows.iter().map(|row| vector(row)).collect())
+    }
 
     const PROC_SOURCE: &str = r#"
 proc bump(x) {
@@ -2699,6 +3671,28 @@ delocal n = -1
     }
 
     #[test]
+    fn compatibility_options_allow_janus_style_update_aliases() {
+        let program = parse_program("xs[0] += xs[i]").expect("program parses");
+        let initial = State::from_bindings([
+            (
+                "xs".to_owned(),
+                Value::Array(vec![Value::Int(5), Value::Int(7)]),
+            ),
+            ("i".to_owned(), Value::Int(0)),
+        ]);
+        let options = ExecutionOptions {
+            allow_update_aliases: true,
+        };
+
+        let tree = execute_with_options(&program, initial.clone(), options).expect("tree runs");
+        let slot =
+            execute_compiled_with_options(&program, initial, options).expect("slot engine runs");
+
+        assert_eq!(tree.to_string(), "{i = 0, xs = [10, 7]}");
+        assert_eq!(slot, tree);
+    }
+
+    #[test]
     fn multidimensional_array_elements_run_forward_and_backward() {
         let program =
             parse_program("xs[1][0] += delta; xs[0][1] <=> xs[1][1]").expect("program parses");
@@ -2721,6 +3715,470 @@ delocal n = -1
         let slot = execute_compiled(&program, initial.clone()).expect("slot engine runs");
         assert_eq!(slot, tree);
         let slot_back = execute_compiled_backward(&program, slot).expect("slot engine reverses");
+        assert_eq!(slot_back, initial);
+    }
+
+    #[test]
+    fn tensor_matmul_update_runs_forward_and_backward() {
+        let program = parse_program("out += matmul(a, b)").expect("program parses");
+        let initial = State::from_bindings([
+            ("a".to_owned(), matrix(&[&[1, 2, 3], &[4, 5, 6]])),
+            ("b".to_owned(), matrix(&[&[7, 8], &[9, 10], &[11, 12]])),
+            ("out".to_owned(), matrix(&[&[0, 0], &[0, 0]])),
+        ]);
+        let expected = State::from_bindings([
+            ("a".to_owned(), matrix(&[&[1, 2, 3], &[4, 5, 6]])),
+            ("b".to_owned(), matrix(&[&[7, 8], &[9, 10], &[11, 12]])),
+            ("out".to_owned(), matrix(&[&[58, 64], &[139, 154]])),
+        ]);
+
+        let tree = execute(&program, initial.clone()).expect("tree engine runs");
+        let slot = execute_compiled(&program, initial.clone()).expect("slot engine runs");
+        assert_eq!(tree, expected);
+        assert_eq!(slot, expected);
+
+        let tree_back = execute_backward(&program, expected.clone()).expect("tree reverses");
+        let slot_back = execute_compiled_backward(&program, expected).expect("slot reverses");
+        assert_eq!(tree_back, initial);
+        assert_eq!(slot_back, initial);
+    }
+
+    #[test]
+    fn tensor_builtins_run_in_both_engines() {
+        let program = parse_program(
+            "dot_out += dot(v, u);
+             q_out += matmul_q31(qx, qw);
+             qmv += matvec_q31(qm, qv);
+             had += hadamard(v, u);
+             mv += matvec(mv_m, mv_v);
+             vm += vecmat(vm_v, vm_m);
+             outer_out += outer(outer_left, outer_right);
+             scaled += scale(outer_left, scale_by);
+             clipped += clamp(z, -1, 5);
+             qclipped += clamp_q31(qz, -1073741824, 1073741824);
+             normalized += normalize_q31(qraw, qmean, qinv_scale);
+             packed += pack_bits(bits);
+             unpacked += unpack_bits(packed, 4);
+             class += one_hot(label, 3);
+             runner += runner_up(logits);
+             margin += top2_margin(logits);
+             label_rank += rank_of(logits, label);
+             top_classes += top_k_indices(logits, 3);
+             top_values += top_k_values(logits, 3);
+             top2_hit += top_k_contains(logits, label, 2);
+             trans += transpose(m);
+             total += sum(m);
+             relu_out += relu(z);
+             mask += relu_mask_q31(z)",
+        )
+        .expect("program parses");
+        let half = 1_073_741_824;
+        let one = 2_147_483_648;
+        let initial = State::from_bindings([
+            ("v".to_owned(), vector(&[2, 3, 4])),
+            ("u".to_owned(), vector(&[5, 6, 7])),
+            ("dot_out".to_owned(), Value::Int(0)),
+            ("qx".to_owned(), matrix(&[&[half, half]])),
+            ("qw".to_owned(), matrix(&[&[half], &[half]])),
+            ("q_out".to_owned(), matrix(&[&[0]])),
+            ("qm".to_owned(), matrix(&[&[half, half]])),
+            ("qv".to_owned(), vector(&[2_147_483_648, half])),
+            ("qmv".to_owned(), vector(&[0])),
+            ("had".to_owned(), vector(&[0, 0, 0])),
+            ("mv_m".to_owned(), matrix(&[&[1, 2, 3], &[4, 5, 6]])),
+            ("mv_v".to_owned(), vector(&[7, 8, 9])),
+            ("mv".to_owned(), vector(&[0, 0])),
+            ("vm_v".to_owned(), vector(&[2, 3])),
+            ("vm_m".to_owned(), matrix(&[&[4, 5], &[6, 7]])),
+            ("vm".to_owned(), vector(&[0, 0])),
+            ("outer_left".to_owned(), vector(&[2, 3])),
+            ("outer_right".to_owned(), vector(&[5, 7])),
+            ("outer_out".to_owned(), matrix(&[&[0, 0], &[0, 0]])),
+            ("scale_by".to_owned(), Value::Int(4)),
+            ("scaled".to_owned(), vector(&[0, 0])),
+            ("clipped".to_owned(), vector(&[0, 0, 0])),
+            ("qz".to_owned(), vector(&[-one, 0, one])),
+            ("qclipped".to_owned(), vector(&[0, 0, 0])),
+            ("qraw".to_owned(), vector(&[one, half, -half])),
+            ("qmean".to_owned(), vector(&[half, 0, -one])),
+            ("qinv_scale".to_owned(), vector(&[half, one, half])),
+            ("normalized".to_owned(), vector(&[0, 0, 0])),
+            ("bits".to_owned(), vector(&[1, 0, 1, 1])),
+            ("packed".to_owned(), Value::Int(0)),
+            ("unpacked".to_owned(), vector(&[0, 0, 0, 0])),
+            ("label".to_owned(), Value::Int(1)),
+            ("class".to_owned(), vector(&[0, 0, 0])),
+            ("logits".to_owned(), vector(&[4, 10, 7])),
+            ("runner".to_owned(), Value::Int(0)),
+            ("margin".to_owned(), Value::Int(0)),
+            ("label_rank".to_owned(), Value::Int(0)),
+            ("top_classes".to_owned(), vector(&[0, 0, 0])),
+            ("top_values".to_owned(), vector(&[0, 0, 0])),
+            ("top2_hit".to_owned(), Value::Int(0)),
+            ("m".to_owned(), matrix(&[&[1, 2, 3], &[4, 5, 6]])),
+            ("trans".to_owned(), matrix(&[&[0, 0], &[0, 0], &[0, 0]])),
+            ("total".to_owned(), Value::Int(0)),
+            ("z".to_owned(), vector(&[-2, 0, 7])),
+            ("relu_out".to_owned(), vector(&[0, 0, 0])),
+            ("mask".to_owned(), vector(&[0, 0, 0])),
+        ]);
+        let expected = State::from_bindings([
+            ("v".to_owned(), vector(&[2, 3, 4])),
+            ("u".to_owned(), vector(&[5, 6, 7])),
+            ("dot_out".to_owned(), Value::Int(56)),
+            ("qx".to_owned(), matrix(&[&[half, half]])),
+            ("qw".to_owned(), matrix(&[&[half], &[half]])),
+            ("q_out".to_owned(), matrix(&[&[half]])),
+            ("qm".to_owned(), matrix(&[&[half, half]])),
+            ("qv".to_owned(), vector(&[2_147_483_648, half])),
+            ("qmv".to_owned(), vector(&[half + 536_870_912])),
+            ("had".to_owned(), vector(&[10, 18, 28])),
+            ("mv_m".to_owned(), matrix(&[&[1, 2, 3], &[4, 5, 6]])),
+            ("mv_v".to_owned(), vector(&[7, 8, 9])),
+            ("mv".to_owned(), vector(&[50, 122])),
+            ("vm_v".to_owned(), vector(&[2, 3])),
+            ("vm_m".to_owned(), matrix(&[&[4, 5], &[6, 7]])),
+            ("vm".to_owned(), vector(&[26, 31])),
+            ("outer_left".to_owned(), vector(&[2, 3])),
+            ("outer_right".to_owned(), vector(&[5, 7])),
+            ("outer_out".to_owned(), matrix(&[&[10, 14], &[15, 21]])),
+            ("scale_by".to_owned(), Value::Int(4)),
+            ("scaled".to_owned(), vector(&[8, 12])),
+            ("clipped".to_owned(), vector(&[-1, 0, 5])),
+            ("qz".to_owned(), vector(&[-one, 0, one])),
+            ("qclipped".to_owned(), vector(&[-half, 0, half])),
+            ("qraw".to_owned(), vector(&[one, half, -half])),
+            ("qmean".to_owned(), vector(&[half, 0, -one])),
+            ("qinv_scale".to_owned(), vector(&[half, one, half])),
+            (
+                "normalized".to_owned(),
+                vector(&[536_870_912, half, 536_870_912]),
+            ),
+            ("bits".to_owned(), vector(&[1, 0, 1, 1])),
+            ("packed".to_owned(), Value::Int(13)),
+            ("unpacked".to_owned(), vector(&[1, 0, 1, 1])),
+            ("label".to_owned(), Value::Int(1)),
+            ("class".to_owned(), vector(&[0, 1, 0])),
+            ("logits".to_owned(), vector(&[4, 10, 7])),
+            ("runner".to_owned(), Value::Int(2)),
+            ("margin".to_owned(), Value::Int(3)),
+            ("label_rank".to_owned(), Value::Int(1)),
+            ("top_classes".to_owned(), vector(&[1, 2, 0])),
+            ("top_values".to_owned(), vector(&[10, 7, 4])),
+            ("top2_hit".to_owned(), Value::Int(1)),
+            ("m".to_owned(), matrix(&[&[1, 2, 3], &[4, 5, 6]])),
+            ("trans".to_owned(), matrix(&[&[1, 4], &[2, 5], &[3, 6]])),
+            ("total".to_owned(), Value::Int(21)),
+            ("z".to_owned(), vector(&[-2, 0, 7])),
+            ("relu_out".to_owned(), vector(&[0, 0, 7])),
+            ("mask".to_owned(), vector(&[0, 0, one])),
+        ]);
+
+        let tree = execute(&program, initial.clone()).expect("tree engine runs");
+        let slot = execute_compiled(&program, initial).expect("slot engine runs");
+
+        assert_eq!(tree, expected);
+        assert_eq!(slot, expected);
+    }
+
+    #[test]
+    fn pack_bits_rejects_non_bit_values() {
+        let program = parse_program("packed += pack_bits(bits)").expect("program parses");
+        let initial = State::from_bindings([
+            ("bits".to_owned(), vector(&[1, 2, 0])),
+            ("packed".to_owned(), Value::Int(0)),
+        ]);
+
+        let tree_error = execute(&program, initial.clone()).expect_err("tree rejects non-bit");
+        let slot_error =
+            execute_compiled(&program, initial).expect_err("slot engine rejects non-bit");
+
+        assert!(tree_error.to_string().contains("expected bit value 0 or 1"));
+        assert!(slot_error.to_string().contains("expected bit value 0 or 1"));
+    }
+
+    #[test]
+    fn mnist_style_q31_step_runs_forward_and_backward() {
+        let program = parse_program(
+            "logits += vecmat_q31(image, weights);
+             prediction += argmax(logits);
+             correct += argmax_eq(logits, label);
+             target += one_hot_q31(label, 3);
+             gradient += outer_q31(image, error);
+             weights -= scale_q31(gradient, lr)",
+        )
+        .expect("program parses");
+        let one = 2_147_483_648;
+        let half = 1_073_741_824;
+        let quarter = 536_870_912;
+        let eighth = 268_435_456;
+        let initial = State::from_bindings([
+            ("image".to_owned(), vector(&[one, half])),
+            (
+                "weights".to_owned(),
+                matrix(&[&[half, 0, one], &[half, one, 0]]),
+            ),
+            ("logits".to_owned(), vector(&[0, 0, 0])),
+            ("prediction".to_owned(), Value::Int(0)),
+            ("correct".to_owned(), Value::Int(0)),
+            ("label".to_owned(), Value::Int(2)),
+            ("target".to_owned(), vector(&[0, 0, 0])),
+            ("error".to_owned(), vector(&[half, -half, one])),
+            ("gradient".to_owned(), matrix(&[&[0, 0, 0], &[0, 0, 0]])),
+            ("lr".to_owned(), Value::Int(half)),
+        ]);
+        let expected = State::from_bindings([
+            ("image".to_owned(), vector(&[one, half])),
+            (
+                "weights".to_owned(),
+                matrix(&[
+                    &[quarter, quarter, half],
+                    &[half - eighth, one + eighth, -quarter],
+                ]),
+            ),
+            ("logits".to_owned(), vector(&[half + quarter, half, one])),
+            ("prediction".to_owned(), Value::Int(2)),
+            ("correct".to_owned(), Value::Int(1)),
+            ("label".to_owned(), Value::Int(2)),
+            ("target".to_owned(), vector(&[0, 0, one])),
+            ("error".to_owned(), vector(&[half, -half, one])),
+            (
+                "gradient".to_owned(),
+                matrix(&[&[half, -half, one], &[quarter, -quarter, half]]),
+            ),
+            ("lr".to_owned(), Value::Int(half)),
+        ]);
+
+        let tree = execute(&program, initial.clone()).expect("tree engine runs");
+        let slot = execute_compiled(&program, initial.clone()).expect("slot engine runs");
+        assert_eq!(tree, expected);
+        assert_eq!(slot, expected);
+
+        let tree_back = execute_backward(&program, expected.clone()).expect("tree reverses");
+        let slot_back = execute_compiled_backward(&program, expected).expect("slot reverses");
+        assert_eq!(tree_back, initial);
+        assert_eq!(slot_back, initial);
+    }
+
+    #[test]
+    fn mnist_witness_tape_runs_forward_and_backward() {
+        let program = parse_program(
+            "global images: tensor<int, 2, 2>;
+             global labels: tensor<int, 2>;
+             global weights: tensor<int, 2, 3>;
+             global bias: tensor<int, 3>;
+             global logits_tape: witness<tensor<int, 2, 3>>;
+             global error_tape: witness<tensor<int, 2, 3>>;
+             global prediction_tape: witness<tensor<int, 2>>;
+             global correct_tape: witness<tensor<int, 2>>;
+             global lr;
+             logits_tape[0] += vecmat_q31(images[0], weights);
+             logits_tape[0] += bias;
+             prediction_tape[0] += argmax(logits_tape[0]);
+             correct_tape[0] += argmax_eq(logits_tape[0], labels[0]);
+             error_tape[0] += logits_tape[0];
+             error_tape[0] -= one_hot_q31(labels[0], 3);
+             weights -= scale_q31(outer_q31(images[0], error_tape[0]), lr);
+             bias -= scale_q31(error_tape[0], lr);
+             logits_tape[1] += vecmat_q31(images[1], weights);
+             logits_tape[1] += bias;
+             prediction_tape[1] += argmax(logits_tape[1]);
+             correct_tape[1] += argmax_eq(logits_tape[1], labels[1]);
+             error_tape[1] += logits_tape[1];
+             error_tape[1] -= one_hot_q31(labels[1], 3);
+             weights -= scale_q31(outer_q31(images[1], error_tape[1]), lr);
+             bias -= scale_q31(error_tape[1], lr)",
+        )
+        .expect("program parses");
+        let one = 2_147_483_648;
+        let half = 1_073_741_824;
+        let initial = State::from_bindings([
+            (
+                "images".to_owned(),
+                Value::Array(vec![vector(&[one, 0]), vector(&[0, one])]),
+            ),
+            ("labels".to_owned(), vector(&[0, 1])),
+            ("weights".to_owned(), matrix(&[&[0, 0, 0], &[0, 0, 0]])),
+            ("bias".to_owned(), vector(&[0, 0, 0])),
+            (
+                "logits_tape".to_owned(),
+                Value::Array(vec![vector(&[0, 0, 0]), vector(&[0, 0, 0])]),
+            ),
+            (
+                "error_tape".to_owned(),
+                Value::Array(vec![vector(&[0, 0, 0]), vector(&[0, 0, 0])]),
+            ),
+            ("prediction_tape".to_owned(), vector(&[0, 0])),
+            ("correct_tape".to_owned(), vector(&[0, 0])),
+            ("lr".to_owned(), Value::Int(half)),
+        ]);
+
+        let tree = execute(&program, initial.clone()).expect("tree engine runs");
+        let slot = execute_compiled(&program, initial.clone()).expect("slot engine runs");
+        assert_eq!(tree, slot);
+        assert_ne!(tree, initial);
+        assert_eq!(tree.get("prediction_tape"), Some(&vector(&[0, 0])));
+
+        let tree_back = execute_backward(&program, tree.clone()).expect("tree reverses");
+        let slot_back = execute_compiled_backward(&program, slot).expect("slot reverses");
+        assert_eq!(tree_back, initial);
+        assert_eq!(slot_back, initial);
+    }
+
+    #[test]
+    fn mnist_witness_tape_iterate_runs_forward_and_backward() {
+        let program = parse_program(
+            "global images: tensor<int, 2, 2>;
+             global labels: tensor<int, 2>;
+             global weights: tensor<int, 2, 3>;
+             global bias: tensor<int, 3>;
+             global logits_tape: witness<tensor<int, 2, 3>>;
+             global error_tape: witness<tensor<int, 2, 3>>;
+             global prediction_tape: witness<tensor<int, 2>>;
+             global correct_tape: witness<tensor<int, 2>>;
+             global lr;
+             iterate int sample = 0 to len(labels) - 1
+               logits_tape[sample] += vecmat_q31(images[sample], weights);
+               logits_tape[sample] += bias;
+               prediction_tape[sample] += argmax(logits_tape[sample]);
+               correct_tape[sample] += argmax_eq(logits_tape[sample], labels[sample]);
+               error_tape[sample] += logits_tape[sample];
+               error_tape[sample] -= one_hot_q31(labels[sample], 3);
+               weights -= scale_q31(outer_q31(images[sample], error_tape[sample]), lr);
+               bias -= scale_q31(error_tape[sample], lr)
+             end",
+        )
+        .expect("program parses");
+        let one = 2_147_483_648;
+        let half = 1_073_741_824;
+        let initial = State::from_bindings([
+            (
+                "images".to_owned(),
+                Value::Array(vec![vector(&[one, 0]), vector(&[0, one])]),
+            ),
+            ("labels".to_owned(), vector(&[0, 1])),
+            ("weights".to_owned(), matrix(&[&[0, 0, 0], &[0, 0, 0]])),
+            ("bias".to_owned(), vector(&[0, 0, 0])),
+            (
+                "logits_tape".to_owned(),
+                Value::Array(vec![vector(&[0, 0, 0]), vector(&[0, 0, 0])]),
+            ),
+            (
+                "error_tape".to_owned(),
+                Value::Array(vec![vector(&[0, 0, 0]), vector(&[0, 0, 0])]),
+            ),
+            ("prediction_tape".to_owned(), vector(&[0, 0])),
+            ("correct_tape".to_owned(), vector(&[0, 0])),
+            ("lr".to_owned(), Value::Int(half)),
+        ]);
+
+        let tree = execute(&program, initial.clone()).expect("tree engine runs");
+        let slot = execute_compiled(&program, initial.clone()).expect("slot engine runs");
+        assert_eq!(tree, slot);
+        assert_eq!(tree.get("prediction_tape"), Some(&vector(&[0, 0])));
+        assert_eq!(tree.get("correct_tape"), Some(&vector(&[1, 0])));
+
+        let tree_back = execute_backward(&program, tree.clone()).expect("tree reverses");
+        let slot_back = execute_compiled_backward(&program, slot).expect("slot reverses");
+        assert_eq!(tree_back, initial);
+        assert_eq!(slot_back, initial);
+    }
+
+    #[test]
+    fn mnist_mlp_witness_trace_runs_forward_and_backward() {
+        let program = parse_program(
+            "global images: tensor<int, 2, 2>;
+             global labels: tensor<int, 2>;
+             global w1: tensor<int, 2, 2>;
+             global b1: tensor<int, 2>;
+             global hidden_pre_tape: witness<tensor<int, 2, 2>>;
+             global hidden_mask_tape: witness<tensor<int, 2, 2>>;
+             global hidden_tape: witness<tensor<int, 2, 2>>;
+             global w2: tensor<int, 2, 3>;
+             global b2: tensor<int, 3>;
+             global logits_tape: witness<tensor<int, 2, 3>>;
+             global out_error_tape: witness<tensor<int, 2, 3>>;
+             global hidden_back_tape: witness<tensor<int, 2, 2>>;
+             global hidden_delta_tape: witness<tensor<int, 2, 2>>;
+             global prediction_tape: witness<tensor<int, 2>>;
+             global correct_tape: witness<tensor<int, 2>>;
+             global lr;
+             iterate int sample = 0 to len(labels) - 1
+               hidden_pre_tape[sample] += vecmat_q31(images[sample], w1);
+               hidden_pre_tape[sample] += b1;
+               hidden_mask_tape[sample] += relu_mask_q31(hidden_pre_tape[sample]);
+               hidden_tape[sample] += relu(hidden_pre_tape[sample]);
+               logits_tape[sample] += vecmat_q31(hidden_tape[sample], w2);
+               logits_tape[sample] += b2;
+               prediction_tape[sample] += argmax(logits_tape[sample]);
+               correct_tape[sample] += argmax_eq(logits_tape[sample], labels[sample]);
+               out_error_tape[sample] += logits_tape[sample];
+               out_error_tape[sample] -= one_hot_q31(labels[sample], 3);
+               hidden_back_tape[sample] += matvec_q31(w2, out_error_tape[sample]);
+               hidden_delta_tape[sample] += hadamard_q31(hidden_back_tape[sample], hidden_mask_tape[sample]);
+               w2 -= scale_q31(outer_q31(hidden_tape[sample], out_error_tape[sample]), lr);
+               b2 -= scale_q31(out_error_tape[sample], lr);
+               w1 -= scale_q31(outer_q31(images[sample], hidden_delta_tape[sample]), lr);
+               b1 -= scale_q31(hidden_delta_tape[sample], lr)
+             end",
+        )
+        .expect("program parses");
+        let one = 2_147_483_648;
+        let half = 1_073_741_824;
+        let initial = State::from_bindings([
+            (
+                "images".to_owned(),
+                Value::Array(vec![vector(&[one, 0]), vector(&[0, one])]),
+            ),
+            ("labels".to_owned(), vector(&[0, 1])),
+            ("w1".to_owned(), matrix(&[&[half, -half], &[0, one]])),
+            ("b1".to_owned(), vector(&[0, 0])),
+            (
+                "hidden_pre_tape".to_owned(),
+                Value::Array(vec![vector(&[0, 0]), vector(&[0, 0])]),
+            ),
+            (
+                "hidden_mask_tape".to_owned(),
+                Value::Array(vec![vector(&[0, 0]), vector(&[0, 0])]),
+            ),
+            (
+                "hidden_tape".to_owned(),
+                Value::Array(vec![vector(&[0, 0]), vector(&[0, 0])]),
+            ),
+            ("w2".to_owned(), matrix(&[&[one, 0, 0], &[0, one, 0]])),
+            ("b2".to_owned(), vector(&[0, 0, 0])),
+            (
+                "logits_tape".to_owned(),
+                Value::Array(vec![vector(&[0, 0, 0]), vector(&[0, 0, 0])]),
+            ),
+            (
+                "out_error_tape".to_owned(),
+                Value::Array(vec![vector(&[0, 0, 0]), vector(&[0, 0, 0])]),
+            ),
+            (
+                "hidden_back_tape".to_owned(),
+                Value::Array(vec![vector(&[0, 0]), vector(&[0, 0])]),
+            ),
+            (
+                "hidden_delta_tape".to_owned(),
+                Value::Array(vec![vector(&[0, 0]), vector(&[0, 0])]),
+            ),
+            ("prediction_tape".to_owned(), vector(&[0, 0])),
+            ("correct_tape".to_owned(), vector(&[0, 0])),
+            ("lr".to_owned(), Value::Int(half)),
+        ]);
+
+        let tree = execute(&program, initial.clone()).expect("tree engine runs");
+        let slot = execute_compiled(&program, initial.clone()).expect("slot engine runs");
+        assert_eq!(tree, slot);
+        let Some(Value::Array(hidden_masks)) = tree.get("hidden_mask_tape") else {
+            panic!("hidden mask tape should be a tensor");
+        };
+        assert_eq!(hidden_masks.first(), Some(&vector(&[one, 0])));
+
+        let tree_back = execute_backward(&program, tree.clone()).expect("tree reverses");
+        let slot_back = execute_compiled_backward(&program, slot).expect("slot reverses");
+        assert_eq!(tree_back, initial);
         assert_eq!(slot_back, initial);
     }
 

@@ -1,0 +1,20 @@
+// MNIST-shaped reversible identification step.
+//
+// This is inference only for a Q31 linear classifier over a full 28x28 image
+// flattened to 784 pixels and 10 class logits. `logits`, `prediction`, and
+// `correct` are retained so the step can be inverted exactly.
+
+global image: tensor<int, 784>;
+global weights: tensor<int, 784, 10>;
+global bias: tensor<int, 10>;
+global logits: tensor<int, 10>;
+global prediction;
+global correct;
+global label = 0;
+
+procedure main() {
+  logits += vecmat_q31(image, weights);
+  logits += bias;
+  prediction += argmax(logits);
+  correct += argmax_eq(logits, label)
+}

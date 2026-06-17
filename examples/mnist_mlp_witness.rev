@@ -1,0 +1,49 @@
+// MNIST-shaped reversible MLP training trace with explicit activation masks.
+//
+// This keeps the information a non-reversible training loop usually discards:
+// hidden preactivations, ReLU masks, hidden activations, output errors, and
+// hidden deltas. The loop bound follows the label tensor length, so the final
+// state is an auditable dataset trace that can be run backward exactly.
+
+global images: tensor<int, 2, 784>;
+global labels: tensor<int, 2> = [0, 1];
+
+global w1: tensor<int, 784, 16>;
+global b1: tensor<int, 16>;
+global hidden_pre_tape: witness<tensor<int, 2, 16>>;
+global hidden_mask_tape: witness<tensor<int, 2, 16>>;
+global hidden_tape: witness<tensor<int, 2, 16>>;
+
+global w2: tensor<int, 16, 10>;
+global b2: tensor<int, 10>;
+global logits_tape: witness<tensor<int, 2, 10>>;
+global out_error_tape: witness<tensor<int, 2, 10>>;
+global hidden_back_tape: witness<tensor<int, 2, 16>>;
+global hidden_delta_tape: witness<tensor<int, 2, 16>>;
+global prediction_tape: witness<tensor<int, 2>>;
+global correct_tape: witness<tensor<int, 2>>;
+global lr = 2147483;
+
+procedure main() {
+  iterate int sample = 0 to len(labels) - 1
+    hidden_pre_tape[sample] += vecmat_q31(images[sample], w1);
+    hidden_pre_tape[sample] += b1;
+    hidden_mask_tape[sample] += relu_mask_q31(hidden_pre_tape[sample]);
+    hidden_tape[sample] += relu(hidden_pre_tape[sample]);
+
+    logits_tape[sample] += vecmat_q31(hidden_tape[sample], w2);
+    logits_tape[sample] += b2;
+    prediction_tape[sample] += argmax(logits_tape[sample]);
+    correct_tape[sample] += argmax_eq(logits_tape[sample], labels[sample]);
+
+    out_error_tape[sample] += logits_tape[sample];
+    out_error_tape[sample] -= one_hot_q31(labels[sample], 10);
+    hidden_back_tape[sample] += matvec_q31(w2, out_error_tape[sample]);
+    hidden_delta_tape[sample] += hadamard_q31(hidden_back_tape[sample], hidden_mask_tape[sample]);
+
+    w2 -= scale_q31(outer_q31(hidden_tape[sample], out_error_tape[sample]), lr);
+    b2 -= scale_q31(out_error_tape[sample], lr);
+    w1 -= scale_q31(outer_q31(images[sample], hidden_delta_tape[sample]), lr);
+    b1 -= scale_q31(hidden_delta_tape[sample], lr)
+  end
+}

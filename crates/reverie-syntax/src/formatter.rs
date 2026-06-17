@@ -70,6 +70,16 @@ pub fn format_type_expr(ty: &TypeExpr) -> String {
         TypeExpr::Int { unit: Some(unit) } => format!("int<{}>", format_unit_expr(&unit.node)),
         TypeExpr::Bool => "bool".to_owned(),
         TypeExpr::Array { element } => format!("array<{}>", format_spanned_type(element)),
+        TypeExpr::Tensor { element, shape } => format!(
+            "tensor<{}, {}>",
+            format_spanned_type(element),
+            shape
+                .iter()
+                .map(|dim| dim.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        TypeExpr::Witness { inner } => format!("witness<{}>", format_spanned_type(inner)),
         TypeExpr::Stack => "stack".to_owned(),
     }
 }
@@ -471,6 +481,10 @@ fn format_expr_with_prec(expr: &SpannedExpr, parent_prec: u8) -> String {
             let right = format_binary_child(right, prec, true);
             format!("{left} {} {right}", binary_op_text(*op))
         }
+        Expr::Call { name, args } => format!(
+            "{name}({})",
+            args.iter().map(format_expr).collect::<Vec<_>>().join(", ")
+        ),
     };
 
     if expr_precedence(expr) < parent_prec {
@@ -504,6 +518,7 @@ fn expr_precedence(expr: &SpannedExpr) -> u8 {
     match &expr.node {
         Expr::Unary { .. } => 11,
         Expr::Binary { op, .. } => binary_precedence(*op),
+        Expr::Call { .. } => 12,
         _ => 12,
     }
 }
@@ -623,5 +638,30 @@ local acceleration: int<m/s^2> where acceleration >= 0<m/s^2> = 10<m/s^2>
   delocal xs = [2<m>, 1<m>]
 delocal acceleration = 10<m/s^2>
 "###);
+    }
+
+    #[test]
+    fn formats_tensor_types_and_builtin_calls() {
+        let program = parse_program("proc linear(x: tensor<int,2,3>, w: tensor<int,3,2>, y: tensor<int,2,2>) { y += matmul(x,w) }")
+            .expect("program parses");
+
+        assert_eq!(
+            format_program(&program),
+            "proc linear(x: tensor<int, 2, 3>, w: tensor<int, 3, 2>, y: tensor<int, 2, 2>) {\n  y += matmul(x, w)\n}\n\ncall main()\n"
+        );
+    }
+
+    #[test]
+    fn formats_witness_types() {
+        let program = parse_program(
+            "global trace: witness<tensor<int,2>>;
+             proc remember(x: tensor<int,2>) { trace += x }",
+        )
+        .expect("program parses");
+
+        assert_eq!(
+            format_program(&program),
+            "global trace: witness<tensor<int, 2>>;\n\nproc remember(x: tensor<int, 2>) {\n  trace += x\n}\n\ncall main()\n"
+        );
     }
 }

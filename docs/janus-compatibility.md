@@ -45,6 +45,7 @@ Primary baseline sources:
 | semicolonless Janus/Jana statement streams | supported |
 | legacy semicolon comments and case-insensitive identifiers | supported with `--legacy-janus` |
 | legacy expression parsing | `--legacy-janus` keeps Reverie's documented precedence while enabling legacy comments/case rules |
+| Jana-style self-dependent update aliases | supported with `--legacy-janus` for upstream compatibility |
 | Janus/Jana type-first procedure params | supported, including `stack s`, `int n`, and `int xs[]` |
 | Janus/Jana source declarations in `main` | supported for scalar ints, multidimensional int arrays, and stacks |
 | local variables | supported with `local` / `delocal`, including checked native and type-first annotations plus deletion-time `where` refinements |
@@ -89,8 +90,10 @@ The original `target/jana-baseline/examples/fib.ja`,
 `target/jana-baseline/examples/run-length-enc.ja`,
 `target/jana-baseline/examples/run-length-enc-stack.ja`,
 `target/jana-baseline/examples/matrixmult_v1.0.ja`, and
-`target/jana-baseline/examples/test2.ja` now check and run directly when the
-Jana checkout is present. `perm-to-code.ja` and the run-length examples broaden
+`target/jana-baseline/examples/test2.ja` now check and run when the Jana
+checkout is present. `matrixmult_v1.0.ja` uses `--legacy-janus` because it
+contains Jana-style self-dependent array updates; strict Reverie mode still
+rejects those aliases. `perm-to-code.ja` and the run-length examples broaden
 the direct upstream corpus beyond numerics; `matrixmult_v1.0.ja` exercises
 nested arrays, `iterate`, and matrix-style lvalue arguments. `test2.ja`
 exercises array-element procedure arguments such as

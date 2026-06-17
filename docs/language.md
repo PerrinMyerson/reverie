@@ -469,6 +469,119 @@ Units may be attached to array element types, such as `array<int<m>>`.
 `size(xs)` is a normal expression and returns the fixed outer length of the
 array or stack as a dimensionless integer.
 
+Tensor annotations are a shaped array surface for dimensionless integer data:
+
+```rev
+global x: tensor<int, 2, 3> = [[1, 2, 3], [4, 5, 6]];
+global w: tensor<int, 3, 2> = [[7, 8], [9, 10], [11, 12]];
+global y: tensor<int, 2, 2>;
+
+procedure main() {
+  y += matmul(x, w)
+}
+```
+
+Tensor values are still nested arrays at runtime. The checker uses the tensor
+shape to validate `matmul`, `matmul_q31`, `matvec`, `matvec_q31`, `vecmat`,
+`vecmat_q31`, `dot`, `dot_q31`, `hadamard`, `hadamard_q31`, `outer`,
+`outer_q31`, `scale`, `scale_q31`, `clamp`, `clamp_q31`, `normalize_q31`,
+`pack_bits`, `unpack_bits`, `transpose`, `sum`, `relu`, `relu_mask_q31`,
+`argmax`, `runner_up`, `top2_margin`, `rank_of`, `top_k_indices`,
+`top_k_values`, `top_k_contains`, `argmax_eq`, `one_hot`, and `one_hot_q31`,
+and whole-tensor `+=`/`-=`
+updates require exact matching shapes. There is no broadcasting in v1.
+
+`witness<T>` marks a value as replay/audit evidence while keeping the same
+runtime representation and type behavior as `T`. This is useful for tensors
+that intentionally survive a forward pass so the inverse can restore mutated
+model state without guessing. For example:
+
+```rev
+global logits_tape: witness<tensor<int, 2, 10>>;
+global error_tape: witness<tensor<int, 2, 10>>;
+```
+
+The marker is accepted anywhere normal type annotations are accepted,
+including parameters, locals, globals, source declarations, and CLI `--type`.
+Nested witness wrappers are rejected because one marker is enough to identify
+audit state. `reverie explain --json` reports `witness_store` and
+`witness_metrics` for shaped witness storage, including static cell counts and
+logical payload bytes. It also reports `dataset_loops` for `iterate` loops
+whose bounds use `len(...)` or `size(...)`, giving audit tooling a stable hook
+for dataset-shaped witness traces. `reverie run --json` and
+`reverie reverse --json` also
+emit `witness_proof`, a deterministic SHA-256 proof over the final witness
+values, with one fingerprint per witness variable and one aggregate payload
+fingerprint. Unsized witness arrays and stacks are reported as unknown instead
+of guessed.
+
+For reversible training, keep forward-pass intermediates as witnesses until the
+inverse has restored any mutated parameters. `examples/mnist_reversible_step.rev`
+does this for a full 784-pixel by 10-class Q31 linear MNIST step: it computes
+logits, records prediction/accuracy, builds a one-hot error witness, and then
+updates weights and bias with `outer_q31` and `scale_q31`. The companion
+`examples/mnist_identify.rev` is the inference-only step, and
+`cargo run -p reverie-cli --bin reverie-mnist-linear -- --self-test` exercises a
+basic train/evaluate/reverse-check loop over synthetic MNIST-shaped data. Add
+`--json` to report the same run as an audit artifact with speed, trace,
+reverse-check, and memory metrics. Training replay bundles include a signed
+proof-cost summary, and `--verify-audit` recomputes that summary while also
+checking forward witness replay and backward restoration to the zero model.
+Exported model bundles preserve that source-audit provenance; `--verify-model`
+checks the model shape, payload bytes, source fingerprint pointer, embedded
+training report, and training proof-cost summary for internal consistency
+without replaying the full trace.
+Exported sample-set bundles preserve audited sample lineage with a signed proof
+over the source-audit pointer, extracted samples, label report, and contiguous
+audit-step claims; `--verify-samples` recomputes that proof before accepting the
+sample set, and when the source audit file is available it also compares each
+exported image, label, and source sample index against the referenced audit
+step.
+Extracted step bundles from `--inspect-audit --step-output` carry a signed
+one-update proof for the before/after model snapshots, sample, witnesses,
+derived update summary, and forward/backward recompute cost.
+Standalone inference bundles from that runner include a signed `proof` object
+that states the deterministic Q31 replay claim, proof payload bytes,
+forward/inverse recompute steps, attribution checks, and fingerprints of the
+model, sample, and recorded result. `--verify-inference` rebuilds that proof
+from fresh Reverie execution before accepting the artifact; when referenced
+model, training-audit, sample, or evaluation artifacts are available, it also
+checks the embedded inputs against those signed sources.
+Saved model-evaluation bundles embed the model, samples, deterministic rows,
+gate policy, and proof-cost fields; `--verify-evaluation` reruns every sample
+and, when the referenced model bundle and sample-set file are present, checks
+the embedded inputs against those signed source artifacts.
+`examples/mnist_witness_tape.rev` moves that trace into `witness<tensor<...>>`
+state: indexed `logits_tape`, `error_tape`, `prediction_tape`, and
+`correct_tape` slots are updated alongside the model so the final state itself
+carries the evidence needed for exact replay. `examples/mnist_witness_tape_loop.rev`
+uses the same state layout inside `iterate int sample = 0 to len(labels) - 1`,
+so the loop follows the dataset tensor length while preserving the same exact
+inverse.
+`examples/mnist_mlp_witness.rev` extends the pattern to a hidden layer by
+recording hidden preactivation, `relu_mask_q31`, hidden activation, output
+error, hidden backprop, and hidden delta witnesses in the same dataset-shaped
+loop before mutating either layer's weights.
+
+Invertible model layers can avoid witness tapes when the layer is built from
+reversible updates. `examples/invertible_coupling.rev` shows an additive
+coupling block: update one activation half from a pure function of the other,
+then update the other half from the new value. Backward execution restores both
+halves by undoing those updates in reverse order.
+`examples/triangular_residual.rev` shows a second family: a Q31 residual block
+where each coordinate reads only later coordinates. The inverse restores later
+coordinates first, then subtracts the same residual terms without recording a
+witness tape.
+Preprocessing can mix no-witness and witness-backed recipes:
+`examples/reversible_preprocess.rev` centers and permutes a raw Q31 sample into
+a separate feature buffer with no witness tape;
+`examples/reversible_normalize.rev` applies `(raw - mean) */ inv_scale` into a
+model-facing feature buffer while preserving the normalization parameters;
+`examples/reversible_clamp.rev` uses `clamp_q31` plus a residual witness
+`raw - clipped` so saturated inputs remain exactly auditable.
+`examples/reversible_pack.rev` uses `pack_bits` and `unpack_bits` to keep a
+compact scalar feature view tied to its exact decoded bit witness.
+
 Units are compile-time annotations on integer types:
 
 ```rev

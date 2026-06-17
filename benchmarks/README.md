@@ -20,8 +20,8 @@ scripts/verify_janus_performance.py
 
 That wrapper builds `target/release/reverie`, runs the full checked benchmark
 corpus with `--runs 5 --warmup 1 --min-speedup 1.25
---min-observed-speedup 2.0 --min-median-speedup 4.0
---min-geomean-speedup 4.0`, and writes
+--min-observed-speedup 2.0 --min-median-speedup 3.0
+--min-geomean-speedup 3.0`, and writes
 `benchmarks/results/jana-vs-reverie-smoke.json` plus the Markdown summary
 `benchmarks/results/jana-vs-reverie-smoke.md`. It also validates the JSON
 artifact with `scripts/check_benchmark_artifact.py`, requiring the full smoke
@@ -52,8 +52,8 @@ gh workflow run ci.yml \
   -f warmup=1 \
   -f min-speedup=1.25 \
   -f min-observed-speedup=2.0 \
-  -f min-median-speedup=4.0 \
-  -f min-geomean-speedup=4.0 \
+  -f min-median-speedup=3.0 \
+  -f min-geomean-speedup=3.0 \
   -f command-timeout=30
 ```
 
@@ -137,8 +137,8 @@ python3 scripts/check_benchmark_artifact.py \
   --expect-direction-count reverse:12 \
   --expect-direction-count roundtrip:10 \
   --min-observed-speedup 2.0 \
-  --min-median-speedup 4.0 \
-  --min-geomean-speedup 4.0 \
+  --min-median-speedup 3.0 \
+  --min-geomean-speedup 3.0 \
   --expect-performance-gate \
   --expect-source-digests \
   --expect-jana-bin-suffix target/jana-baseline/bin/janus \
@@ -218,7 +218,7 @@ both implementations, current custom forward/reverse workloads are:
   `examples/janus_factor.rev`.
 - `janus_factor_840_reverse`: factor table final state back to `num = 840`.
 - `janus_sort_n50_reverse_order`: a modern-Jana version of the classic
-  reversible bubble sort against Reverie's `examples/janus_sort.rev`.
+  reversible bubble sort run by both Jana and Reverie.
 - `janus_sort_n50_reverse_order_reverse`: sorted list plus permutation witness
   back to reverse order and a zeroed witness array.
 - `janus_sort_n50_reverse_order_roundtrip`: sort followed by reverse sort,

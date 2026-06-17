@@ -9,14 +9,17 @@ numbers cannot drift away from semantic agreement.
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
 import math
 import os
 import platform
+import signal
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -45,6 +48,12 @@ class Benchmark:
     name: str
     jana: SideSpec
     reverie: SideSpec
+
+
+@dataclass(frozen=True)
+class Measurement:
+    elapsed_seconds: float
+    max_rss_bytes: int
 
 
 def workload_direction(name: str) -> str:
@@ -118,6 +127,14 @@ def parse_args() -> argparse.Namespace:
         "--json-output",
         type=Path,
         help="Write machine-readable benchmark results to this JSON file.",
+    )
+    parser.add_argument(
+        "--measure-memory",
+        action="store_true",
+        help=(
+            "Record per-sample peak RSS alongside timing. This uses wait4 on "
+            "Unix-like systems and may add a little timing overhead."
+        ),
     )
     parser.add_argument(
         "--min-speedup",
@@ -388,8 +405,12 @@ def benchmarks(jana_bin: Path, reverie_bin: Path, jana_dir: Path) -> list[Benchm
         "--var",
         "y=4",
     ]
-    matrix_zero_store = (
-        f"{{A = {matrix_zero}, B = {matrix_zero}, LDU = {matrix_zero}, "
+    matrix_legacy_store = (
+        f"{{a = {matrix_a}, b = {matrix_b}, ldu = {matrix_zero}, "
+        "n = 3, x = 2, y = 4}"
+    )
+    matrix_legacy_zero_store = (
+        f"{{a = {matrix_zero}, b = {matrix_zero}, ldu = {matrix_zero}, "
         "n = 0, x = 0, y = 0}"
     )
     transpose_output = "[[1, 4, 7], [2, 5, 8], [3, 6, 9]]"
@@ -632,12 +653,10 @@ def benchmarks(jana_bin: Path, reverie_bin: Path, jana_dir: Path) -> list[Benchm
                 argv=[
                     str(reverie_bin),
                     "run",
+                    "--legacy-janus",
                     str(jana_dir / "examples" / "matrixmult_v1.0.ja"),
                 ],
-                expected_stdout=[
-                    f"{{A = {matrix_a}, B = {matrix_b}, LDU = {matrix_zero}, "
-                    "n = 3, x = 2, y = 4}"
-                ],
+                expected_stdout=[matrix_legacy_store],
             ),
         ),
         Benchmark(
@@ -661,10 +680,11 @@ def benchmarks(jana_bin: Path, reverie_bin: Path, jana_dir: Path) -> list[Benchm
                 argv=[
                     str(reverie_bin),
                     "reverse",
+                    "--legacy-janus",
                     str(jana_dir / "examples" / "matrixmult_v1.0.ja"),
                     *matrix_seed_args,
                 ],
-                expected_stdout=[matrix_zero_store],
+                expected_stdout=[matrix_legacy_zero_store],
             ),
         ),
         Benchmark(
@@ -703,27 +723,26 @@ def benchmarks(jana_bin: Path, reverie_bin: Path, jana_dir: Path) -> list[Benchm
             ),
             reverie=command_sequence(
                 CommandSpec(
-                    argv=[
-                        str(reverie_bin),
-                        "run",
-                        str(jana_dir / "examples" / "matrixmult_v1.0.ja"),
-                    ],
-                    expected_stdout=[
-                        f"{{A = {matrix_a}, B = {matrix_b}, LDU = {matrix_zero}, "
-                        "n = 3, x = 2, y = 4}"
-                    ],
-                ),
+                        argv=[
+                            str(reverie_bin),
+                            "run",
+                            "--legacy-janus",
+                            str(jana_dir / "examples" / "matrixmult_v1.0.ja"),
+                        ],
+                        expected_stdout=[matrix_legacy_store],
+                    ),
                 CommandSpec(
-                    argv=[
-                        str(reverie_bin),
-                        "reverse",
-                        str(jana_dir / "examples" / "matrixmult_v1.0.ja"),
-                        *matrix_seed_args,
-                    ],
-                    expected_stdout=[matrix_zero_store],
+                        argv=[
+                            str(reverie_bin),
+                            "reverse",
+                            "--legacy-janus",
+                            str(jana_dir / "examples" / "matrixmult_v1.0.ja"),
+                            *matrix_seed_args,
+                        ],
+                        expected_stdout=[matrix_legacy_zero_store],
+                    ),
                 ),
             ),
-        ),
         Benchmark(
             name="matrix_transpose_3x3",
             jana=CommandSpec(
@@ -1524,7 +1543,7 @@ def benchmarks(jana_bin: Path, reverie_bin: Path, jana_dir: Path) -> list[Benchm
                 argv=[
                     str(reverie_bin),
                     "run",
-                    str(REPO_ROOT / "examples" / "janus_sort.rev"),
+                    str(REPO_ROOT / "benchmarks" / "jana" / "sort_n50_reverse.ja"),
                     "--var",
                     "n=50",
                     "--var",
@@ -1568,7 +1587,7 @@ def benchmarks(jana_bin: Path, reverie_bin: Path, jana_dir: Path) -> list[Benchm
                 argv=[
                     str(reverie_bin),
                     "reverse",
-                    str(REPO_ROOT / "examples" / "janus_sort.rev"),
+                    str(REPO_ROOT / "benchmarks" / "jana" / "sort_n50_reverse.ja"),
                     "--var",
                     "n=50",
                     "--var",
@@ -1629,7 +1648,7 @@ def benchmarks(jana_bin: Path, reverie_bin: Path, jana_dir: Path) -> list[Benchm
                     argv=[
                         str(reverie_bin),
                         "run",
-                        str(REPO_ROOT / "examples" / "janus_sort.rev"),
+                        str(REPO_ROOT / "benchmarks" / "jana" / "sort_n50_reverse.ja"),
                         "--var",
                         "n=50",
                         "--var",
@@ -1651,7 +1670,7 @@ def benchmarks(jana_bin: Path, reverie_bin: Path, jana_dir: Path) -> list[Benchm
                     argv=[
                         str(reverie_bin),
                         "reverse",
-                        str(REPO_ROOT / "examples" / "janus_sort.rev"),
+                        str(REPO_ROOT / "benchmarks" / "jana" / "sort_n50_reverse.ja"),
                         "--var",
                         "n=50",
                         "--var",
@@ -2026,6 +2045,13 @@ def format_side(side: SideSpec) -> str:
 
 def verify(spec: CommandSpec, timeout: float) -> None:
     completed = run_checked(spec.argv, timeout=timeout)
+    verify_completed(spec, completed)
+
+
+def verify_completed(
+    spec: CommandSpec,
+    completed: subprocess.CompletedProcess[str],
+) -> None:
     for expected in spec.expected_stdout:
         if expected not in completed.stdout:
             raise RuntimeError(
@@ -2045,15 +2071,139 @@ def verify_side(side: SideSpec, timeout: float) -> None:
         verify(spec, timeout)
 
 
-def time_command(side: SideSpec, warmup: int, runs: int, timeout: float) -> list[float]:
+def run_checked_measured(
+    argv: list[str],
+    cwd: Path = REPO_ROOT,
+    timeout: Optional[float] = DEFAULT_COMMAND_TIMEOUT_SECONDS,
+) -> tuple[subprocess.CompletedProcess[str], int]:
+    stdout_file = tempfile.TemporaryFile(mode="w+b")
+    stderr_file = tempfile.TemporaryFile(mode="w+b")
+    try:
+        pid = os.fork()
+    except AttributeError:
+        completed = run_checked(argv, cwd=cwd, timeout=timeout)
+        return completed, 0
+    except OSError as error:
+        raise RuntimeError(f"could not fork for `{argv[0]}`: {error}") from error
+
+    if pid == 0:
+        try:
+            os.chdir(cwd)
+            os.dup2(stdout_file.fileno(), 1)
+            os.dup2(stderr_file.fileno(), 2)
+            stdout_file.close()
+            stderr_file.close()
+            os.execvp(argv[0], argv)
+        except OSError as error:
+            message = f"could not run `{argv[0]}`: {error}\n".encode()
+            try:
+                os.write(2, message)
+            finally:
+                os._exit(127 if error.errno == errno.ENOENT else 126)
+
+    deadline = None if timeout is None else time.monotonic() + timeout
+    rusage = None
+    status = 0
+    while True:
+        waited_pid, status, rusage = os.wait4(pid, os.WNOHANG)
+        if waited_pid == pid:
+            break
+        if deadline is not None and time.monotonic() >= deadline:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            _, _, killed_rusage = os.wait4(pid, 0)
+            stdout = read_tempfile_text(stdout_file)
+            stderr = read_tempfile_text(stderr_file)
+            details = [
+                f"command timed out after {timeout:.3f}s: {format_command(argv)}",
+            ]
+            if stdout:
+                details.append(f"stdout:\n{stdout}")
+            if stderr:
+                details.append(f"stderr:\n{stderr}")
+            raise RuntimeError("\n".join(details))
+        time.sleep(0.001)
+
+    stdout = read_tempfile_text(stdout_file)
+    stderr = read_tempfile_text(stderr_file)
+    returncode = wait_status_to_returncode(status)
+    completed = subprocess.CompletedProcess(argv, returncode, stdout, stderr)
+    if returncode != 0:
+        details = [
+            f"command failed: {format_command(argv)}",
+            f"exit status: {returncode}",
+        ]
+        if stdout:
+            details.append(f"stdout:\n{stdout}")
+        if stderr:
+            details.append(f"stderr:\n{stderr}")
+        raise RuntimeError("\n".join(details))
+    max_rss_bytes = rusage_max_rss_bytes(rusage.ru_maxrss if rusage else 0)
+    return completed, max_rss_bytes
+
+
+def read_tempfile_text(handle: Any) -> str:
+    handle.seek(0)
+    return handle.read().decode("utf-8", errors="replace")
+
+
+def wait_status_to_returncode(status: int) -> int:
+    if os.WIFEXITED(status):
+        return os.WEXITSTATUS(status)
+    if os.WIFSIGNALED(status):
+        return -os.WTERMSIG(status)
+    return status
+
+
+def rusage_max_rss_bytes(max_rss: int) -> int:
+    if max_rss <= 0:
+        return 0
+    if sys.platform == "darwin":
+        return int(max_rss)
+    return int(max_rss) * 1024
+
+
+def measure_side(side: SideSpec, timeout: float) -> Measurement:
+    start = time.perf_counter()
+    max_rss_bytes = 0
+    for spec in side_commands(side):
+        completed, command_max_rss_bytes = run_checked_measured(
+            spec.argv,
+            timeout=timeout,
+        )
+        verify_completed(spec, completed)
+        max_rss_bytes = max(max_rss_bytes, command_max_rss_bytes)
+    return Measurement(
+        elapsed_seconds=time.perf_counter() - start,
+        max_rss_bytes=max_rss_bytes,
+    )
+
+
+def time_command(
+    side: SideSpec,
+    warmup: int,
+    runs: int,
+    timeout: float,
+    measure_memory: bool,
+) -> list[Measurement]:
     for _ in range(warmup):
         verify_side(side, timeout)
 
     samples = []
     for _ in range(runs):
-        start = time.perf_counter()
-        verify_side(side, timeout)
-        samples.append(time.perf_counter() - start)
+        if measure_memory:
+            samples.append(measure_side(side, timeout))
+        else:
+            start = time.perf_counter()
+            verify_side(side, timeout)
+            samples.append(
+                Measurement(
+                    elapsed_seconds=time.perf_counter() - start,
+                    max_rss_bytes=0,
+                )
+            )
     return samples
 
 
@@ -2079,20 +2229,54 @@ def source_file_metadata(commands: list[CommandSpec]) -> list[dict[str, str]]:
     return [{"path": path, "sha256": sha256} for path, sha256 in sorted(files.items())]
 
 
-def summarize(samples: list[float]) -> str:
-    median_ms = statistics.median(samples) * 1_000
-    mean_ms = statistics.mean(samples) * 1_000
-    min_ms = min(samples) * 1_000
-    return f"median={median_ms:.3f}ms mean={mean_ms:.3f}ms min={min_ms:.3f}ms"
+def summarize(samples: list[Measurement]) -> str:
+    seconds = elapsed_samples(samples)
+    rss = rss_samples(samples)
+    median_ms = statistics.median(seconds) * 1_000
+    mean_ms = statistics.mean(seconds) * 1_000
+    min_ms = min(seconds) * 1_000
+    rss_text = (
+        f" peak-rss-median={format_bytes(statistics.median(rss))}"
+        if any(rss)
+        else ""
+    )
+    return (
+        f"median={median_ms:.3f}ms mean={mean_ms:.3f}ms "
+        f"min={min_ms:.3f}ms{rss_text}"
+    )
 
 
-def sample_summary(samples: list[float]) -> dict[str, Union[float, list[float]]]:
-    return {
-        "median_seconds": statistics.median(samples),
-        "mean_seconds": statistics.mean(samples),
-        "min_seconds": min(samples),
-        "samples_seconds": samples,
+def elapsed_samples(samples: list[Measurement]) -> list[float]:
+    return [sample.elapsed_seconds for sample in samples]
+
+
+def rss_samples(samples: list[Measurement]) -> list[int]:
+    return [sample.max_rss_bytes for sample in samples]
+
+
+def sample_summary(samples: list[Measurement]) -> dict[str, Any]:
+    seconds = elapsed_samples(samples)
+    rss = rss_samples(samples)
+    payload: dict[str, Any] = {
+        "median_seconds": statistics.median(seconds),
+        "mean_seconds": statistics.mean(seconds),
+        "min_seconds": min(seconds),
+        "samples_seconds": seconds,
     }
+    if any(rss):
+        payload.update(
+            {
+                "median_max_rss_bytes": statistics.median(rss),
+                "mean_max_rss_bytes": statistics.mean(rss),
+                "max_rss_bytes": max(rss),
+                "samples_max_rss_bytes": rss,
+            }
+        )
+    return payload
+
+
+def format_bytes(value: Union[int, float]) -> str:
+    return f"{value / (1024 * 1024):.2f}MiB"
 
 
 def run_optional(argv: list[str], cwd: Path) -> Optional[subprocess.CompletedProcess[str]]:
@@ -2363,19 +2547,30 @@ def main() -> int:
                 args.warmup,
                 args.runs,
                 args.command_timeout,
+                args.measure_memory,
             )
             reverie_samples = time_command(
                 bench.reverie,
                 args.warmup,
                 args.runs,
                 args.command_timeout,
+                args.measure_memory,
             )
-            jana_median = statistics.median(jana_samples)
-            reverie_median = statistics.median(reverie_samples)
+            jana_median = statistics.median(elapsed_samples(jana_samples))
+            reverie_median = statistics.median(elapsed_samples(reverie_samples))
             speedup = jana_median / reverie_median
+            jana_rss_median = statistics.median(rss_samples(jana_samples))
+            reverie_rss_median = statistics.median(rss_samples(reverie_samples))
+            memory_ratio = (
+                jana_rss_median / reverie_rss_median
+                if reverie_rss_median > 0
+                else None
+            )
             print(f"jana    {summarize(jana_samples)}")
             print(f"reverie {summarize(reverie_samples)}")
             print(f"speedup {speedup:.2f}x")
+            if memory_ratio is not None:
+                print(f"rss     jana/reverie {memory_ratio:.2f}x")
             if args.min_speedup is not None and speedup < args.min_speedup:
                 print(f"gate    FAIL: below required {args.min_speedup:.2f}x")
                 speedup_failures.append((bench.name, speedup))
@@ -2383,26 +2578,27 @@ def main() -> int:
                 print(f"gate    PASS: meets required {args.min_speedup:.2f}x")
             print()
 
-            benchmark_results.append(
-                {
-                    "name": bench.name,
-                    "direction": workload_direction(bench.name),
-                    "jana": {
-                        **side_json(bench.jana),
-                        **sample_summary(jana_samples),
-                    },
-                    "reverie": {
-                        **side_json(bench.reverie),
-                        **sample_summary(reverie_samples),
-                    },
-                    "speedup": speedup,
-                    "passes_min_speedup": (
-                        None
-                        if args.min_speedup is None
-                        else speedup >= args.min_speedup
-                    ),
-                }
-            )
+            result = {
+                "name": bench.name,
+                "direction": workload_direction(bench.name),
+                "jana": {
+                    **side_json(bench.jana),
+                    **sample_summary(jana_samples),
+                },
+                "reverie": {
+                    **side_json(bench.reverie),
+                    **sample_summary(reverie_samples),
+                },
+                "speedup": speedup,
+                "passes_min_speedup": (
+                    None
+                    if args.min_speedup is None
+                    else speedup >= args.min_speedup
+                ),
+            }
+            if memory_ratio is not None:
+                result["memory_ratio"] = memory_ratio
+            benchmark_results.append(result)
 
         if args.json_output is not None:
             write_json_results(args.json_output, json_results)

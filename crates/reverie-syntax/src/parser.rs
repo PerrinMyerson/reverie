@@ -896,7 +896,7 @@ fn type_expr_parser() -> impl Parser<Token, SpannedType, Error = ParseError> + C
             just(Token::BoolType).map_with_span(|_, span| Spanned::new(TypeExpr::Bool, span));
 
         let array = just(Token::ArrayType)
-            .ignore_then(ty.delimited_by(just(Token::Lt), just(Token::Gt)))
+            .ignore_then(ty.clone().delimited_by(just(Token::Lt), just(Token::Gt)))
             .map_with_span(|element, span| {
                 Spanned::new(
                     TypeExpr::Array {
@@ -906,10 +906,42 @@ fn type_expr_parser() -> impl Parser<Token, SpannedType, Error = ParseError> + C
                 )
             });
 
+        let tensor_shape = just(Token::Comma)
+            .ignore_then(select! { Token::Int(value) => value })
+            .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
+            .repeated()
+            .at_least(1);
+        let tensor = select! { Token::Ident(name) if name.eq_ignore_ascii_case("tensor") => () }
+            .ignore_then(
+                ty.clone()
+                    .then(tensor_shape)
+                    .delimited_by(just(Token::Lt), just(Token::Gt)),
+            )
+            .map_with_span(|(element, shape), span| {
+                Spanned::new(
+                    TypeExpr::Tensor {
+                        element: Box::new(element),
+                        shape,
+                    },
+                    span,
+                )
+            });
+
+        let witness = select! { Token::Ident(name) if name.eq_ignore_ascii_case("witness") => () }
+            .ignore_then(ty.clone().delimited_by(just(Token::Lt), just(Token::Gt)))
+            .map_with_span(|inner, span| {
+                Spanned::new(
+                    TypeExpr::Witness {
+                        inner: Box::new(inner),
+                    },
+                    span,
+                )
+            });
+
         let stack =
             just(Token::StackType).map_with_span(|_, span| Spanned::new(TypeExpr::Stack, span));
 
-        choice((array, int, bool, stack))
+        choice((witness, tensor, array, int, bool, stack))
     })
 }
 
@@ -1032,6 +1064,14 @@ fn modern_expr_parser_with(
         let peek_expr = select! { Token::Ident(name) if name == "peek" => () }
             .ignore_then(ident.delimited_by(just(Token::LParen), just(Token::RParen)))
             .map_with_span(|target, span| Spanned::new(Expr::Top { target }, span));
+        let call_expr = select! { Token::Ident(name) => name }
+            .then(
+                expr.clone()
+                    .separated_by(just(Token::Comma))
+                    .allow_trailing()
+                    .delimited_by(just(Token::LParen), just(Token::RParen)),
+            )
+            .map_with_span(|(name, args), span| Spanned::new(Expr::Call { name, args }, span));
 
         let atom = choice((
             select! { Token::Int(value) => value }
@@ -1056,6 +1096,7 @@ fn modern_expr_parser_with(
             peek_expr,
             len_expr,
             size_expr,
+            call_expr,
             indexed_var,
             just(Token::LParen)
                 .ignore_then(expr.clone())
@@ -1794,6 +1835,64 @@ end
         ));
         let ty = parse_type_expr("array<bool>").expect("type parses");
         assert!(matches!(ty.node, TypeExpr::Array { .. }));
+    }
+
+    #[test]
+    fn parses_tensor_type_annotations_and_builtin_calls() {
+        let ty = parse_type_expr("tensor<int, 2, 3>").expect("type parses");
+        let TypeExpr::Tensor { element, shape } = ty.node else {
+            panic!("expected tensor type");
+        };
+        assert!(matches!(element.node, TypeExpr::Int { .. }));
+        assert_eq!(shape, vec![2, 3]);
+
+        let program = parse_program(
+            "local out: tensor<int, 2, 2> = [[0, 0], [0, 0]]
+               out += matmul(a, b)
+             delocal out = [[58, 64], [139, 154]]",
+        )
+        .expect("program parses");
+        let Stmt::Local { ty, body, .. } = program.body.node else {
+            panic!("expected local tensor");
+        };
+        assert!(matches!(
+            ty.expect("tensor annotation").node,
+            TypeExpr::Tensor { .. }
+        ));
+        let Stmt::Update { expr, .. } = body.node else {
+            panic!("expected tensor update");
+        };
+        assert!(matches!(
+            expr.node,
+            Expr::Call { ref name, .. } if name == "matmul"
+        ));
+    }
+
+    #[test]
+    fn parses_witness_type_annotations() {
+        let ty = parse_type_expr("witness<tensor<int, 2, 3>>").expect("type parses");
+        let TypeExpr::Witness { inner } = ty.node else {
+            panic!("expected witness type");
+        };
+        let TypeExpr::Tensor { element, shape } = inner.node else {
+            panic!("expected witness tensor payload");
+        };
+        assert!(matches!(element.node, TypeExpr::Int { .. }));
+        assert_eq!(shape, vec![2, 3]);
+
+        let program = parse_program(
+            "global trace: witness<tensor<int, 2>>;
+             trace += [1, 2]",
+        )
+        .expect("program parses");
+        assert!(matches!(
+            program.globals[0]
+                .ty
+                .as_ref()
+                .expect("type annotation")
+                .node,
+            TypeExpr::Witness { .. }
+        ));
     }
 
     #[test]

@@ -1,0 +1,49 @@
+{
+  "config": {
+    "audit_output": null,
+    "dataset_kind": "idx",
+    "epochs": 1,
+    "eval_limit": null,
+    "lr": 2147483,
+    "reverse_check": true,
+    "train_limit": null
+  },
+  "eval": {
+    "accuracy_percent": 82.52,
+    "correct": 8252,
+    "elapsed_seconds": 2.6198578340000003,
+    "samples": 10000,
+    "samples_per_second": 3817.0010105975844
+  },
+  "kind": "reverie_mnist_linear_q31",
+  "memory": {
+    "dataset_payload_bytes": 54950000,
+    "estimated_payload_bytes": 67012800,
+    "eval_dataset_payload_bytes": 7850000,
+    "model_payload_bytes": 62800,
+    "peak_rss_bytes": 140902400,
+    "trace_payload_bytes": 12000000,
+    "train_dataset_payload_bytes": 47100000
+  },
+  "reverse": {
+    "checked": 60000,
+    "elapsed_seconds": 37.93168175,
+    "enabled": true,
+    "restored_initial_model": true,
+    "steps_per_second": 1581.7911896300247
+  },
+  "self_test": false,
+  "trace": {
+    "bytes_per_step": 200,
+    "enabled": true,
+    "entries": 60000,
+    "payload_bytes": 12000000
+  },
+  "train": {
+    "accuracy_percent": 84.65333333333334,
+    "correct": 50792,
+    "elapsed_seconds": 34.3501905,
+    "samples": 60000,
+    "updates_per_second": 1746.715203806512
+  }
+}

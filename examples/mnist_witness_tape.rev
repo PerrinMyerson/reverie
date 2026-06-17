@@ -1,0 +1,36 @@
+// MNIST-shaped two-step training trace with first-class witness tapes.
+//
+// Unlike `mnist_reversible_step.rev`, the per-sample witnesses live in
+// ordinary Reverie tensor state: `logits_tape`, `error_tape`,
+// `prediction_tape`, and `correct_tape`. The inverse can restore `weights`
+// and `bias` using only the final model plus these tape tensors.
+
+global images: tensor<int, 2, 784>;
+global labels: tensor<int, 2>;
+global weights: tensor<int, 784, 10>;
+global bias: tensor<int, 10>;
+global logits_tape: witness<tensor<int, 2, 10>>;
+global error_tape: witness<tensor<int, 2, 10>>;
+global prediction_tape: witness<tensor<int, 2>>;
+global correct_tape: witness<tensor<int, 2>>;
+global lr = 2147483;
+
+procedure main() {
+  logits_tape[0] += vecmat_q31(images[0], weights);
+  logits_tape[0] += bias;
+  prediction_tape[0] += argmax(logits_tape[0]);
+  correct_tape[0] += argmax_eq(logits_tape[0], labels[0]);
+  error_tape[0] += logits_tape[0];
+  error_tape[0] -= one_hot_q31(labels[0], 10);
+  weights -= scale_q31(outer_q31(images[0], error_tape[0]), lr);
+  bias -= scale_q31(error_tape[0], lr);
+
+  logits_tape[1] += vecmat_q31(images[1], weights);
+  logits_tape[1] += bias;
+  prediction_tape[1] += argmax(logits_tape[1]);
+  correct_tape[1] += argmax_eq(logits_tape[1], labels[1]);
+  error_tape[1] += logits_tape[1];
+  error_tape[1] -= one_hot_q31(labels[1], 10);
+  weights -= scale_q31(outer_q31(images[1], error_tape[1]), lr);
+  bias -= scale_q31(error_tape[1], lr)
+}

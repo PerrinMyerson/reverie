@@ -5,6 +5,8 @@ use reverie_syntax::{
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
+const MAX_PACK_BITS: usize = 63;
+
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[error("{message}")]
 pub struct CoreError {
@@ -66,23 +68,50 @@ impl CoreError {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct CheckOptions {
+    pub allow_update_aliases: bool,
+}
+
 pub fn check_program(program: &Program) -> Result<(), CoreError> {
     check_program_with_types(program, std::iter::empty::<(String, SpannedType)>())
+}
+
+pub fn check_program_with_options(
+    program: &Program,
+    options: CheckOptions,
+) -> Result<(), CoreError> {
+    check_program_with_types_and_options(
+        program,
+        std::iter::empty::<(String, SpannedType)>(),
+        options,
+    )
 }
 
 pub fn check_program_with_types(
     program: &Program,
     external_types: impl IntoIterator<Item = (String, SpannedType)>,
 ) -> Result<(), CoreError> {
+    check_program_with_types_and_options(program, external_types, CheckOptions::default())
+}
+
+pub fn check_program_with_types_and_options(
+    program: &Program,
+    external_types: impl IntoIterator<Item = (String, SpannedType)>,
+    options: CheckOptions,
+) -> Result<(), CoreError> {
     check_globals(&program.globals)?;
     let procedures = procedure_map(&program.procedures)?;
     for procedure in &program.procedures {
-        check_procedure(procedure, &procedures)?;
+        check_procedure(procedure, &procedures, options)?;
     }
 
-    check_stmt(&program.body, &procedures)?;
+    check_stmt(&program.body, &procedures, options)?;
 
     let external_types = external_types.into_iter().collect::<Vec<_>>();
+    for (_, ty) in &external_types {
+        check_type_annotation(ty)?;
+    }
     check_external_global_types(&program.globals, &external_types)?;
     let base_env = TypeEnv::from_globals_and_annotations(&program.globals, external_types);
     check_global_units(&program.globals, &base_env)?;
@@ -256,18 +285,37 @@ fn procedure_map(procedures: &[Proc]) -> Result<ProcedureMap<'_>, CoreError> {
     Ok(map)
 }
 
-fn check_procedure(procedure: &Proc, procedures: &ProcedureMap<'_>) -> Result<(), CoreError> {
+fn check_procedure(
+    procedure: &Proc,
+    procedures: &ProcedureMap<'_>,
+    options: CheckOptions,
+) -> Result<(), CoreError> {
     ensure_unique_param_names(
         &procedure.params,
         procedure.span.clone(),
         format!("procedure `{}` has duplicate parameters", procedure.name),
     )?;
-    check_stmt(&procedure.body, procedures)
+    for param in &procedure.params {
+        if let Some(ty) = &param.ty {
+            check_type_annotation(ty)?;
+        }
+    }
+    check_stmt(&procedure.body, procedures, options)
 }
 
 fn check_globals(globals: &[GlobalDecl]) -> Result<(), CoreError> {
     let mut seen = BTreeMap::new();
     for global in globals {
+        if let Some(ty) = &global.ty {
+            check_type_annotation(ty)?;
+            reject_tensor_array_suffix(
+                "global",
+                &global.name,
+                &global.dims,
+                ty,
+                global.span.clone(),
+            )?;
+        }
         if global.dims.contains(&0) || global.len == 0 {
             return Err(CoreError::new(
                 format!("global `{}` must have length at least 1", global.name),
@@ -300,7 +348,11 @@ fn check_globals(globals: &[GlobalDecl]) -> Result<(), CoreError> {
     Ok(())
 }
 
-fn check_stmt(statement: &SpannedStmt, procedures: &ProcedureMap<'_>) -> Result<(), CoreError> {
+fn check_stmt(
+    statement: &SpannedStmt,
+    procedures: &ProcedureMap<'_>,
+    options: CheckOptions,
+) -> Result<(), CoreError> {
     match &statement.node {
         Stmt::Skip => Ok(()),
         Stmt::Assert { .. } => Ok(()),
@@ -348,7 +400,7 @@ fn check_stmt(statement: &SpannedStmt, procedures: &ProcedureMap<'_>) -> Result<
         }
         Stmt::Seq(statements) => {
             for statement in statements {
-                check_stmt(statement, procedures)?;
+                check_stmt(statement, procedures, options)?;
             }
 
             Ok(())
@@ -365,7 +417,9 @@ fn check_stmt(statement: &SpannedStmt, procedures: &ProcedureMap<'_>) -> Result<
                 ));
             }
 
-            if expr_mentions_forbidden_update_dependency(expr, target) {
+            if !options.allow_update_aliases
+                && expr_mentions_forbidden_update_dependency(expr, target)
+            {
                 return Err(CoreError::new(
                     format!(
                         "irreversible update: `{}` reads the value being changed",
@@ -432,14 +486,14 @@ fn check_stmt(statement: &SpannedStmt, procedures: &ProcedureMap<'_>) -> Result<
             else_branch,
             ..
         } => {
-            check_stmt(then_branch, procedures)?;
-            check_stmt(else_branch, procedures)
+            check_stmt(then_branch, procedures, options)?;
+            check_stmt(else_branch, procedures, options)
         }
         Stmt::Loop { body, step, .. } => {
-            check_stmt(body, procedures)?;
-            check_stmt(step, procedures)
+            check_stmt(body, procedures, options)?;
+            check_stmt(step, procedures, options)
         }
-        Stmt::Iterate { body, .. } => check_stmt(body, procedures),
+        Stmt::Iterate { body, .. } => check_stmt(body, procedures, options),
         Stmt::Local {
             name,
             ty: _,
@@ -474,7 +528,7 @@ fn check_stmt(statement: &SpannedStmt, procedures: &ProcedureMap<'_>) -> Result<
                 ));
             }
 
-            check_stmt(body, procedures)
+            check_stmt(body, procedures, options)
         }
     }
 }
@@ -574,6 +628,7 @@ fn expr_mentions(expr: &SpannedExpr, name: &str) -> bool {
         Expr::Empty { target } | Expr::Top { target } | Expr::Size { target } => target == name,
         Expr::Unary { expr, .. } => expr_mentions(expr, name),
         Expr::Binary { left, right, .. } => expr_mentions(left, name) || expr_mentions(right, name),
+        Expr::Call { args, .. } => args.iter().any(|arg| expr_mentions(arg, name)),
     }
 }
 
@@ -607,6 +662,9 @@ fn expr_mentions_forbidden_update_dependency(expr: &SpannedExpr, target: &Place)
             expr_mentions_forbidden_update_dependency(left, target)
                 || expr_mentions_forbidden_update_dependency(right, target)
         }
+        Expr::Call { args, .. } => args
+            .iter()
+            .any(|arg| expr_mentions_forbidden_update_dependency(arg, target)),
     }
 }
 
@@ -695,11 +753,14 @@ impl TypeEnv {
             env.insert_with_shape(
                 global.name.clone(),
                 global_type(global),
-                shape_from_declared_dims(&global.dims),
+                declared_shape_from_dims_and_type(&global.dims, global.ty.as_ref()),
             );
         }
         for (name, ty) in types {
-            env.insert_external(name, type_from_annotation(&ty));
+            let shape = shape_from_type_expr(&ty)
+                .or_else(|| env.shape(&name).cloned())
+                .unwrap_or_default();
+            env.insert_external(name, type_from_annotation(&ty), shape);
         }
         env
     }
@@ -729,9 +790,18 @@ impl TypeEnv {
         self.vars.insert(name, info)
     }
 
-    fn insert_external(&mut self, name: String, info: TypeInfo) -> Option<TypeInfo> {
+    fn insert_external(
+        &mut self,
+        name: String,
+        info: TypeInfo,
+        shape: ArrayShape,
+    ) -> Option<TypeInfo> {
         self.external.insert(name.clone());
-        self.shapes.remove(&name);
+        if shape.is_empty() {
+            self.shapes.remove(&name);
+        } else {
+            self.shapes.insert(name.clone(), shape);
+        }
         self.vars.insert(name, info)
     }
 
@@ -844,7 +914,12 @@ fn check_procedure_units(
 ) -> Result<(), CoreError> {
     let mut env = base_env.clone();
     for param in &procedure.params {
-        env.insert(param.name.clone(), param_type(param));
+        let shape = param
+            .ty
+            .as_ref()
+            .and_then(shape_from_type_expr)
+            .unwrap_or_default();
+        env.insert_with_shape(param.name.clone(), param_type(param), shape);
     }
 
     for param in &procedure.params {
@@ -909,6 +984,47 @@ fn shape_from_local_dims_and_init(dims: &[Option<usize>], init: &SpannedExpr) ->
     shape
 }
 
+fn shape_from_local_dims_type_and_init(
+    dims: &[Option<usize>],
+    ty: Option<&SpannedType>,
+    init: &SpannedExpr,
+) -> ArrayShape {
+    if dims.is_empty()
+        && let Some(shape) = ty.and_then(shape_from_type_expr)
+    {
+        return shape;
+    }
+
+    shape_from_local_dims_and_init(dims, init)
+}
+
+fn check_known_initializer_shape(
+    kind: &str,
+    name: &str,
+    expected_shape: &ArrayShape,
+    init: &SpannedExpr,
+) -> Result<(), CoreError> {
+    if expected_shape.is_empty() {
+        return Ok(());
+    }
+
+    let Some(actual_shape) = array_literal_shape(init) else {
+        return Ok(());
+    };
+    if exact_shape(expected_shape) == exact_shape(&actual_shape) {
+        return Ok(());
+    }
+
+    Err(CoreError::new(
+        format!(
+            "{kind} `{name}` expected tensor shape {}, found {}",
+            display_shape(expected_shape),
+            display_shape(&actual_shape)
+        ),
+        init.span.clone(),
+    ))
+}
+
 fn array_literal_shape(expr: &SpannedExpr) -> Option<ArrayShape> {
     let Expr::Array(elements) = &expr.node else {
         return None;
@@ -945,6 +1061,12 @@ fn check_global_units(globals: &[GlobalDecl], env: &TypeEnv) -> Result<(), CoreE
                 init.span.clone(),
             )?;
             check_declared_initializer_shape(&global.name, &global.dims, init)?;
+            check_known_initializer_shape(
+                "global",
+                &global.name,
+                &declared_shape_from_dims_and_type(&global.dims, global.ty.as_ref()),
+                init,
+            )?;
         }
     }
 
@@ -959,6 +1081,7 @@ fn check_external_global_types(
         let declared = global_type(global);
         for (name, ty) in external_types {
             if name == &global.name {
+                check_type_annotation(ty)?;
                 compatible_types_between(
                     &declared,
                     &type_from_annotation(ty),
@@ -980,12 +1103,133 @@ fn type_from_annotation(ty: &SpannedType) -> TypeInfo {
         }),
         TypeExpr::Bool => TypeInfo::Bool,
         TypeExpr::Array { element } => TypeInfo::Array(Box::new(type_from_annotation(element))),
+        TypeExpr::Tensor { element, shape } => {
+            type_with_tensor_shape(shape, type_from_annotation(element))
+        }
+        TypeExpr::Witness { inner } => type_from_annotation(inner),
         TypeExpr::Stack => TypeInfo::Stack,
     }
 }
 
 fn is_array_type_annotation(ty: &SpannedType) -> bool {
-    matches!(ty.node, TypeExpr::Array { .. })
+    match &ty.node {
+        TypeExpr::Array { .. } => true,
+        TypeExpr::Witness { inner } => is_array_type_annotation(inner),
+        TypeExpr::Int { .. } | TypeExpr::Bool | TypeExpr::Tensor { .. } | TypeExpr::Stack => false,
+    }
+}
+
+fn type_with_tensor_shape(shape: &[usize], element: TypeInfo) -> TypeInfo {
+    shape
+        .iter()
+        .rev()
+        .fold(element, |element, _| TypeInfo::Array(Box::new(element)))
+}
+
+fn shape_from_type_expr(ty: &SpannedType) -> Option<ArrayShape> {
+    match &ty.node {
+        TypeExpr::Tensor { shape, .. } => Some(shape.iter().copied().map(Some).collect()),
+        TypeExpr::Array { element } => shape_from_type_expr(element),
+        TypeExpr::Witness { inner } => shape_from_type_expr(inner),
+        TypeExpr::Int { .. } | TypeExpr::Bool | TypeExpr::Stack => None,
+    }
+}
+
+fn declared_shape_from_dims_and_type(dims: &[usize], ty: Option<&SpannedType>) -> ArrayShape {
+    if !dims.is_empty() {
+        return shape_from_declared_dims(dims);
+    }
+
+    ty.and_then(shape_from_type_expr).unwrap_or_default()
+}
+
+fn check_type_annotation(ty: &SpannedType) -> Result<(), CoreError> {
+    match &ty.node {
+        TypeExpr::Int { .. } | TypeExpr::Bool | TypeExpr::Stack => Ok(()),
+        TypeExpr::Array { element } => {
+            if type_contains_tensor(element) {
+                return Err(CoreError::new(
+                    "array-wrapped tensor types are not supported; put all tensor dimensions in the tensor type",
+                    ty.span.clone(),
+                ));
+            }
+            check_type_annotation(element)
+        }
+        TypeExpr::Tensor { element, shape } => {
+            if shape.is_empty() || shape.contains(&0) {
+                return Err(CoreError::new(
+                    "tensor dimensions must be positive",
+                    ty.span.clone(),
+                ));
+            }
+            if !is_dimensionless_int_type_expr(element) {
+                return Err(CoreError::new(
+                    "tensor element type must be dimensionless int",
+                    element.span.clone(),
+                ));
+            }
+            Ok(())
+        }
+        TypeExpr::Witness { inner } => {
+            if type_contains_witness(inner) {
+                return Err(CoreError::new(
+                    "nested witness types are not supported",
+                    ty.span.clone(),
+                ));
+            }
+            check_type_annotation(inner)
+        }
+    }
+}
+
+fn type_contains_tensor(ty: &SpannedType) -> bool {
+    match &ty.node {
+        TypeExpr::Tensor { .. } => true,
+        TypeExpr::Array { element } => type_contains_tensor(element),
+        TypeExpr::Witness { inner } => type_contains_tensor(inner),
+        TypeExpr::Int { .. } | TypeExpr::Bool | TypeExpr::Stack => false,
+    }
+}
+
+fn type_contains_witness(ty: &SpannedType) -> bool {
+    match &ty.node {
+        TypeExpr::Witness { .. } => true,
+        TypeExpr::Array { element } | TypeExpr::Tensor { element, .. } => {
+            type_contains_witness(element)
+        }
+        TypeExpr::Int { .. } | TypeExpr::Bool | TypeExpr::Stack => false,
+    }
+}
+
+fn is_dimensionless_int_type_expr(ty: &SpannedType) -> bool {
+    match &ty.node {
+        TypeExpr::Int { unit: None } => true,
+        TypeExpr::Int { unit: Some(unit) } => unit.node.factors.is_empty(),
+        TypeExpr::Bool
+        | TypeExpr::Array { .. }
+        | TypeExpr::Tensor { .. }
+        | TypeExpr::Witness { .. }
+        | TypeExpr::Stack => false,
+    }
+}
+
+fn reject_tensor_array_suffix(
+    kind: &str,
+    name: &str,
+    dims: &[usize],
+    ty: &SpannedType,
+    span: SourceSpan,
+) -> Result<(), CoreError> {
+    if !dims.is_empty() && type_contains_tensor(ty) {
+        return Err(CoreError::new(
+            format!(
+                "{kind} `{name}` cannot combine tensor type dimensions with trailing array dimensions"
+            ),
+            span,
+        ));
+    }
+
+    Ok(())
 }
 
 fn check_stmt_units(
@@ -1009,14 +1253,25 @@ fn check_stmt_units(
 
             match op {
                 UpdateOp::Add | UpdateOp::Sub => {
-                    let target_unit = expect_int_type(&target_type, statement.span.clone())?;
-                    let expr_unit = expect_int_type(&expr_type, expr.span.clone())?;
-                    compatible_units_between(
-                        &target_unit,
-                        &expr_unit,
-                        statement.span.clone(),
-                        expr.span.clone(),
-                    )?;
+                    if is_array_type(&target_type) || is_array_type(&expr_type) {
+                        check_tensor_update_type(
+                            target,
+                            &target_type,
+                            expr,
+                            &expr_type,
+                            env,
+                            statement.span.clone(),
+                        )?;
+                    } else {
+                        let target_unit = expect_int_type(&target_type, statement.span.clone())?;
+                        let expr_unit = expect_int_type(&expr_type, expr.span.clone())?;
+                        compatible_units_between(
+                            &target_unit,
+                            &expr_unit,
+                            statement.span.clone(),
+                            expr.span.clone(),
+                        )?;
+                    }
                 }
                 UpdateOp::Xor => {
                     check_xor_update_type(
@@ -1151,6 +1406,8 @@ fn check_stmt_units(
             init,
             ..
         } => {
+            check_type_annotation(ty)?;
+            reject_tensor_array_suffix("declaration", name, dims, ty, statement.span.clone())?;
             reject_zero_declared_dims("declaration", name, dims, statement.span.clone())?;
             if dims.is_empty() && is_array_type_annotation(ty) {
                 return Err(CoreError::new(
@@ -1184,8 +1441,18 @@ fn check_stmt_units(
                     init.span.clone(),
                 )?;
                 check_declared_initializer_shape(name, dims, init)?;
+                check_known_initializer_shape(
+                    "declaration",
+                    name,
+                    &declared_shape_from_dims_and_type(dims, Some(ty)),
+                    init,
+                )?;
             }
-            env.insert_with_shape(name.clone(), declared, shape_from_declared_dims(dims));
+            env.insert_with_shape(
+                name.clone(),
+                declared,
+                declared_shape_from_dims_and_type(dims, Some(ty)),
+            );
             Ok(())
         }
         Stmt::Local {
@@ -1201,6 +1468,26 @@ fn check_stmt_units(
             delocal_refinement,
             delocal,
         } => {
+            if let Some(ty) = ty {
+                check_type_annotation(ty)?;
+                reject_tensor_array_suffix(
+                    "local",
+                    name,
+                    &option_dims_to_dims(dims),
+                    ty,
+                    statement.span.clone(),
+                )?;
+            }
+            if let Some(delocal_ty) = delocal_ty {
+                check_type_annotation(delocal_ty)?;
+                reject_tensor_array_suffix(
+                    "delocal",
+                    name,
+                    &option_dims_to_dims(delocal_dims),
+                    delocal_ty,
+                    statement.span.clone(),
+                )?;
+            }
             reject_zero_local_dims(name, dims, "local", statement.span.clone())?;
             reject_zero_local_dims(name, delocal_dims, "delocal", statement.span.clone())?;
             if env.contains(name) {
@@ -1225,8 +1512,14 @@ fn check_stmt_units(
                 None => init_type,
             };
             check_array_suffix_initializer_shape(name, dims, init)?;
+            check_known_initializer_shape(
+                "local",
+                name,
+                &shape_from_local_dims_type_and_init(dims, ty.as_ref(), init),
+                init,
+            )?;
 
-            let local_shape = shape_from_local_dims_and_init(dims, init);
+            let local_shape = shape_from_local_dims_type_and_init(dims, ty.as_ref(), init);
             env.insert_with_shape(name.clone(), local_type.clone(), local_shape);
             if let Some(refinement) = refinement {
                 expect_bool_expr(refinement, env)?;
@@ -1257,6 +1550,12 @@ fn check_stmt_units(
             )?;
             check_array_suffix_initializer_shape(name, dims, delocal)?;
             check_array_suffix_initializer_shape(name, delocal_dims, delocal)?;
+            let expected_delocal_shape = shape_from_local_dims_type_and_init(
+                delocal_dims,
+                delocal_ty.as_ref().or(ty.as_ref()),
+                delocal,
+            );
+            check_known_initializer_shape("delocal", name, &expected_delocal_shape, delocal)?;
             env.remove(name);
             Ok(())
         }
@@ -1291,6 +1590,10 @@ fn reject_zero_local_dims(
         ));
     }
     Ok(())
+}
+
+fn option_dims_to_dims(dims: &[Option<usize>]) -> Vec<usize> {
+    dims.iter().map(|dim| dim.unwrap_or(usize::MAX)).collect()
 }
 
 fn check_declared_initializer_shape(
@@ -1403,6 +1706,7 @@ fn expr_type(expr: &SpannedExpr, env: &TypeEnv) -> Result<TypeInfo, CoreError> {
         Expr::Size { target } => size_type(target, env, expr.span.clone()),
         Expr::Unary { op, expr } => unary_type(*op, expr, env),
         Expr::Binary { op, left, right } => binary_type(*op, left, right, env),
+        Expr::Call { name, args } => tensor_call_type(name, args, env, expr.span.clone()),
     }
 }
 
@@ -1452,6 +1756,609 @@ fn check_array_literal_shapes_compatible(
     }
 
     Ok(())
+}
+
+fn is_array_type(info: &TypeInfo) -> bool {
+    matches!(info, TypeInfo::Array(_))
+}
+
+fn check_tensor_update_type(
+    target: &Place,
+    target_type: &TypeInfo,
+    expr: &SpannedExpr,
+    expr_type: &TypeInfo,
+    env: &TypeEnv,
+    target_span: SourceSpan,
+) -> Result<(), CoreError> {
+    let target_unit = expect_int_tensor_type(target_type, target_span.clone())?;
+    let expr_unit = expect_int_tensor_type(expr_type, expr.span.clone())?;
+    compatible_units_between(
+        &target_unit,
+        &expr_unit,
+        target_span.clone(),
+        expr.span.clone(),
+    )?;
+
+    let target_shape = exact_shape(&shape_after_place(target, env)).ok_or_else(|| {
+        CoreError::new(
+            format!(
+                "tensor update target `{}` must have a statically known shape",
+                display_place(target)
+            ),
+            target_span.clone(),
+        )
+    })?;
+    if target_shape.is_empty() {
+        return Err(CoreError::new(
+            format!(
+                "tensor update target `{}` must be an array or tensor",
+                display_place(target)
+            ),
+            target_span,
+        ));
+    }
+
+    let expr_shape = expr_shape(expr, env)?
+        .and_then(|shape| exact_shape(&shape))
+        .ok_or_else(|| {
+            CoreError::new(
+                "tensor update right-hand side must have a statically known shape",
+                expr.span.clone(),
+            )
+        })?;
+    if target_shape != expr_shape {
+        return Err(CoreError::with_labels(
+            format!(
+                "tensor update shape mismatch: target {}, right-hand side {}",
+                display_exact_shape(&target_shape),
+                display_exact_shape(&expr_shape)
+            ),
+            expr.span.clone(),
+            vec![
+                CoreLabel::new(target_span, "target shape"),
+                CoreLabel::new(expr.span.clone(), "right-hand side shape"),
+            ],
+        ));
+    }
+
+    Ok(())
+}
+
+fn expect_int_tensor_type(info: &TypeInfo, span: SourceSpan) -> Result<UnitInfo, CoreError> {
+    let mut current = info;
+    let mut rank = 0;
+    loop {
+        match current {
+            TypeInfo::Unknown => return Ok(UnitInfo::Unknown),
+            TypeInfo::Array(element) => {
+                rank += 1;
+                current = element;
+            }
+            TypeInfo::Int(unit) if rank > 0 => return Ok(unit.clone()),
+            TypeInfo::Int(_) | TypeInfo::Bool | TypeInfo::Stack => {
+                return Err(CoreError::new("expected int tensor expression", span));
+            }
+        }
+    }
+}
+
+fn tensor_call_type(
+    name: &str,
+    args: &[SpannedExpr],
+    env: &TypeEnv,
+    span: SourceSpan,
+) -> Result<TypeInfo, CoreError> {
+    let shape = tensor_call_shape(name, args, env, span)?;
+    if shape.is_empty() {
+        Ok(TypeInfo::Int(UnitInfo::Known(UnitDim::dimensionless())))
+    } else {
+        Ok(type_with_tensor_shape(
+            &shape,
+            TypeInfo::Int(UnitInfo::Known(UnitDim::dimensionless())),
+        ))
+    }
+}
+
+fn tensor_call_shape(
+    name: &str,
+    args: &[SpannedExpr],
+    env: &TypeEnv,
+    span: SourceSpan,
+) -> Result<Vec<usize>, CoreError> {
+    match name {
+        "matmul" | "matmul_q31" => {
+            expect_arg_count(name, args, 2, span.clone())?;
+            let left = expect_tensor_arg(name, 1, &args[0], env)?;
+            let right = expect_tensor_arg(name, 2, &args[1], env)?;
+            expect_rank(name, 1, &left, 2, args[0].span.clone())?;
+            expect_rank(name, 2, &right, 2, args[1].span.clone())?;
+            if left[1] != right[0] {
+                return Err(CoreError::with_labels(
+                    format!(
+                        "{name} inner dimension mismatch: left has {}, right has {}",
+                        left[1], right[0]
+                    ),
+                    args[1].span.clone(),
+                    vec![
+                        CoreLabel::new(args[0].span.clone(), "left matrix"),
+                        CoreLabel::new(args[1].span.clone(), "right matrix"),
+                    ],
+                ));
+            }
+            Ok(vec![left[0], right[1]])
+        }
+        "matvec" | "matvec_q31" => {
+            expect_arg_count(name, args, 2, span.clone())?;
+            let matrix = expect_tensor_arg(name, 1, &args[0], env)?;
+            let vector = expect_tensor_arg(name, 2, &args[1], env)?;
+            expect_rank(name, 1, &matrix, 2, args[0].span.clone())?;
+            expect_rank(name, 2, &vector, 1, args[1].span.clone())?;
+            if matrix[1] != vector[0] {
+                return Err(CoreError::with_labels(
+                    format!(
+                        "{name} inner dimension mismatch: matrix has {}, vector has {}",
+                        matrix[1], vector[0]
+                    ),
+                    args[1].span.clone(),
+                    vec![
+                        CoreLabel::new(args[0].span.clone(), "matrix"),
+                        CoreLabel::new(args[1].span.clone(), "vector"),
+                    ],
+                ));
+            }
+            Ok(vec![matrix[0]])
+        }
+        "vecmat" | "vecmat_q31" => {
+            expect_arg_count(name, args, 2, span.clone())?;
+            let vector = expect_tensor_arg(name, 1, &args[0], env)?;
+            let matrix = expect_tensor_arg(name, 2, &args[1], env)?;
+            expect_rank(name, 1, &vector, 1, args[0].span.clone())?;
+            expect_rank(name, 2, &matrix, 2, args[1].span.clone())?;
+            if vector[0] != matrix[0] {
+                return Err(CoreError::with_labels(
+                    format!(
+                        "{name} inner dimension mismatch: vector has {}, matrix has {}",
+                        vector[0], matrix[0]
+                    ),
+                    args[1].span.clone(),
+                    vec![
+                        CoreLabel::new(args[0].span.clone(), "vector"),
+                        CoreLabel::new(args[1].span.clone(), "matrix"),
+                    ],
+                ));
+            }
+            Ok(vec![matrix[1]])
+        }
+        "dot" | "dot_q31" => {
+            expect_arg_count(name, args, 2, span.clone())?;
+            let left = expect_tensor_arg(name, 1, &args[0], env)?;
+            let right = expect_tensor_arg(name, 2, &args[1], env)?;
+            expect_rank(name, 1, &left, 1, args[0].span.clone())?;
+            expect_rank(name, 2, &right, 1, args[1].span.clone())?;
+            expect_same_shape(
+                name,
+                &left,
+                &right,
+                args[0].span.clone(),
+                args[1].span.clone(),
+            )?;
+            Ok(Vec::new())
+        }
+        "hadamard" | "hadamard_q31" => {
+            expect_arg_count(name, args, 2, span.clone())?;
+            let left = expect_tensor_arg(name, 1, &args[0], env)?;
+            let right = expect_tensor_arg(name, 2, &args[1], env)?;
+            expect_same_shape(
+                name,
+                &left,
+                &right,
+                args[0].span.clone(),
+                args[1].span.clone(),
+            )?;
+            Ok(left)
+        }
+        "outer" | "outer_q31" => {
+            expect_arg_count(name, args, 2, span.clone())?;
+            let left = expect_tensor_arg(name, 1, &args[0], env)?;
+            let right = expect_tensor_arg(name, 2, &args[1], env)?;
+            expect_rank(name, 1, &left, 1, args[0].span.clone())?;
+            expect_rank(name, 2, &right, 1, args[1].span.clone())?;
+            Ok(vec![left[0], right[0]])
+        }
+        "scale" | "scale_q31" => {
+            expect_arg_count(name, args, 2, span.clone())?;
+            let shape = expect_tensor_arg(name, 1, &args[0], env)?;
+            expect_scalar_int_arg(name, 2, &args[1], env)?;
+            Ok(shape)
+        }
+        "clamp" | "clamp_q31" => {
+            expect_arg_count(name, args, 3, span.clone())?;
+            let shape = expect_tensor_arg(name, 1, &args[0], env)?;
+            expect_scalar_int_arg(name, 2, &args[1], env)?;
+            expect_scalar_int_arg(name, 3, &args[2], env)?;
+            if let (Some(lower), Some(upper)) =
+                (const_int_value(&args[1]), const_int_value(&args[2]))
+            {
+                if lower > upper {
+                    return Err(CoreError::with_labels(
+                        format!("{name} lower bound {lower} exceeds upper bound {upper}"),
+                        args[2].span.clone(),
+                        vec![
+                            CoreLabel::new(args[1].span.clone(), "lower bound"),
+                            CoreLabel::new(args[2].span.clone(), "upper bound"),
+                        ],
+                    ));
+                }
+            }
+            Ok(shape)
+        }
+        "normalize_q31" => {
+            expect_arg_count(name, args, 3, span.clone())?;
+            let value = expect_tensor_arg(name, 1, &args[0], env)?;
+            let mean = expect_tensor_arg(name, 2, &args[1], env)?;
+            let inv_scale = expect_tensor_arg(name, 3, &args[2], env)?;
+            expect_same_shape(
+                name,
+                &value,
+                &mean,
+                args[0].span.clone(),
+                args[1].span.clone(),
+            )?;
+            expect_same_shape(
+                name,
+                &value,
+                &inv_scale,
+                args[0].span.clone(),
+                args[2].span.clone(),
+            )?;
+            Ok(value)
+        }
+        "transpose" => {
+            expect_arg_count(name, args, 1, span.clone())?;
+            let shape = expect_tensor_arg(name, 1, &args[0], env)?;
+            expect_rank(name, 1, &shape, 2, args[0].span.clone())?;
+            Ok(vec![shape[1], shape[0]])
+        }
+        "sum" => {
+            expect_arg_count(name, args, 1, span.clone())?;
+            let shape = expect_tensor_arg(name, 1, &args[0], env)?;
+            expect_min_rank(name, 1, &shape, 1, args[0].span.clone())?;
+            Ok(Vec::new())
+        }
+        "relu" | "relu_mask_q31" => {
+            expect_arg_count(name, args, 1, span.clone())?;
+            let shape = expect_tensor_arg(name, 1, &args[0], env)?;
+            expect_min_rank(name, 1, &shape, 1, args[0].span.clone())?;
+            Ok(shape)
+        }
+        "argmax" => {
+            expect_arg_count(name, args, 1, span.clone())?;
+            let shape = expect_tensor_arg(name, 1, &args[0], env)?;
+            expect_min_rank(name, 1, &shape, 1, args[0].span.clone())?;
+            Ok(Vec::new())
+        }
+        "runner_up" | "top2_margin" => {
+            expect_arg_count(name, args, 1, span.clone())?;
+            let shape = expect_tensor_arg(name, 1, &args[0], env)?;
+            expect_min_rank(name, 1, &shape, 1, args[0].span.clone())?;
+            expect_min_tensor_cells(name, 1, &shape, 2, args[0].span.clone())?;
+            Ok(Vec::new())
+        }
+        "top_k_indices" | "top_k_values" => {
+            expect_arg_count(name, args, 2, span.clone())?;
+            let shape = expect_tensor_arg(name, 1, &args[0], env)?;
+            expect_min_rank(name, 1, &shape, 1, args[0].span.clone())?;
+            let cells = tensor_cell_count(&shape);
+            let k = expect_positive_const_usize_arg(name, 2, &args[1])?;
+            if k > cells {
+                return Err(CoreError::new(
+                    format!("{name} argument 2 must be <= tensor cell count {cells}, found {k}"),
+                    args[1].span.clone(),
+                ));
+            }
+            Ok(vec![k])
+        }
+        "top_k_contains" => {
+            expect_arg_count(name, args, 3, span.clone())?;
+            let shape = expect_tensor_arg(name, 1, &args[0], env)?;
+            expect_min_rank(name, 1, &shape, 1, args[0].span.clone())?;
+            expect_scalar_int_arg(name, 2, &args[1], env)?;
+            let cells = tensor_cell_count(&shape);
+            let k = expect_positive_const_usize_arg(name, 3, &args[2])?;
+            if k > cells {
+                return Err(CoreError::new(
+                    format!("{name} argument 3 must be <= tensor cell count {cells}, found {k}"),
+                    args[2].span.clone(),
+                ));
+            }
+            Ok(Vec::new())
+        }
+        "rank_of" => {
+            expect_arg_count(name, args, 2, span.clone())?;
+            let shape = expect_tensor_arg(name, 1, &args[0], env)?;
+            expect_min_rank(name, 1, &shape, 1, args[0].span.clone())?;
+            expect_min_tensor_cells(name, 1, &shape, 1, args[0].span.clone())?;
+            expect_scalar_int_arg(name, 2, &args[1], env)?;
+            Ok(Vec::new())
+        }
+        "argmax_eq" => {
+            expect_arg_count(name, args, 2, span.clone())?;
+            let shape = expect_tensor_arg(name, 1, &args[0], env)?;
+            expect_min_rank(name, 1, &shape, 1, args[0].span.clone())?;
+            expect_scalar_int_arg(name, 2, &args[1], env)?;
+            Ok(Vec::new())
+        }
+        "one_hot" | "one_hot_q31" => {
+            expect_arg_count(name, args, 2, span.clone())?;
+            expect_scalar_int_arg(name, 1, &args[0], env)?;
+            let classes = expect_positive_const_usize_arg(name, 2, &args[1])?;
+            Ok(vec![classes])
+        }
+        "pack_bits" => {
+            expect_arg_count(name, args, 1, span.clone())?;
+            let shape = expect_tensor_arg(name, 1, &args[0], env)?;
+            expect_rank(name, 1, &shape, 1, args[0].span.clone())?;
+            if shape[0] > MAX_PACK_BITS {
+                return Err(CoreError::new(
+                    format!(
+                        "{name} supports at most {MAX_PACK_BITS} bits, found {}",
+                        shape[0]
+                    ),
+                    args[0].span.clone(),
+                ));
+            }
+            Ok(Vec::new())
+        }
+        "unpack_bits" => {
+            expect_arg_count(name, args, 2, span.clone())?;
+            expect_scalar_int_arg(name, 1, &args[0], env)?;
+            let width = expect_pack_width_arg(name, 2, &args[1])?;
+            Ok(vec![width])
+        }
+        _ => Err(CoreError::new(
+            format!("unknown tensor builtin `{name}`"),
+            span,
+        )),
+    }
+}
+
+fn expect_arg_count(
+    name: &str,
+    args: &[SpannedExpr],
+    expected: usize,
+    span: SourceSpan,
+) -> Result<(), CoreError> {
+    if args.len() == expected {
+        return Ok(());
+    }
+
+    Err(CoreError::new(
+        format!(
+            "{name} expects {expected} argument(s), found {}",
+            args.len()
+        ),
+        span,
+    ))
+}
+
+fn expect_tensor_arg(
+    builtin: &str,
+    index: usize,
+    arg: &SpannedExpr,
+    env: &TypeEnv,
+) -> Result<Vec<usize>, CoreError> {
+    let info = expr_type(arg, env)?;
+    let unit = expect_int_tensor_type(&info, arg.span.clone())?;
+    require_dimensionless(&unit, arg.span.clone())?;
+    expr_shape(arg, env)?
+        .and_then(|shape| exact_shape(&shape))
+        .filter(|shape| !shape.is_empty())
+        .ok_or_else(|| {
+            CoreError::new(
+                format!(
+                    "{builtin} argument {index} must be an int tensor with a statically known shape"
+                ),
+                arg.span.clone(),
+            )
+        })
+}
+
+fn expect_scalar_int_arg(
+    builtin: &str,
+    index: usize,
+    arg: &SpannedExpr,
+    env: &TypeEnv,
+) -> Result<(), CoreError> {
+    let unit = expect_int_expr(arg, env)?;
+    require_dimensionless(&unit, arg.span.clone()).map_err(|_| {
+        CoreError::new(
+            format!("{builtin} argument {index} must be a dimensionless int"),
+            arg.span.clone(),
+        )
+    })
+}
+
+fn expect_positive_const_usize_arg(
+    builtin: &str,
+    index: usize,
+    arg: &SpannedExpr,
+) -> Result<usize, CoreError> {
+    let Some(value) = const_int_value(arg) else {
+        return Err(CoreError::new(
+            format!("{builtin} argument {index} must be a constant positive int"),
+            arg.span.clone(),
+        ));
+    };
+    let Ok(usize_value) = usize::try_from(value) else {
+        return Err(CoreError::new(
+            format!("{builtin} argument {index} must be positive, found {value}"),
+            arg.span.clone(),
+        ));
+    };
+    if usize_value == 0 {
+        return Err(CoreError::new(
+            format!("{builtin} argument {index} must be positive"),
+            arg.span.clone(),
+        ));
+    }
+    Ok(usize_value)
+}
+
+fn expect_pack_width_arg(
+    builtin: &str,
+    index: usize,
+    arg: &SpannedExpr,
+) -> Result<usize, CoreError> {
+    let width = expect_positive_const_usize_arg(builtin, index, arg)?;
+    if width > MAX_PACK_BITS {
+        return Err(CoreError::new(
+            format!("{builtin} supports at most {MAX_PACK_BITS} bits, found {width}"),
+            arg.span.clone(),
+        ));
+    }
+    Ok(width)
+}
+
+fn expect_rank(
+    builtin: &str,
+    index: usize,
+    shape: &[usize],
+    rank: usize,
+    span: SourceSpan,
+) -> Result<(), CoreError> {
+    if shape.len() == rank {
+        return Ok(());
+    }
+
+    Err(CoreError::new(
+        format!(
+            "{builtin} argument {index} expected rank {rank}, found rank {}",
+            shape.len()
+        ),
+        span,
+    ))
+}
+
+fn expect_min_rank(
+    builtin: &str,
+    index: usize,
+    shape: &[usize],
+    rank: usize,
+    span: SourceSpan,
+) -> Result<(), CoreError> {
+    if shape.len() >= rank {
+        return Ok(());
+    }
+
+    Err(CoreError::new(
+        format!(
+            "{builtin} argument {index} expected rank at least {rank}, found rank {}",
+            shape.len()
+        ),
+        span,
+    ))
+}
+
+fn expect_min_tensor_cells(
+    builtin: &str,
+    index: usize,
+    shape: &[usize],
+    min_cells: usize,
+    span: SourceSpan,
+) -> Result<(), CoreError> {
+    let cells = tensor_cell_count(shape);
+    if cells >= min_cells {
+        return Ok(());
+    }
+
+    Err(CoreError::new(
+        format!(
+            "{builtin} argument {index} expected at least {min_cells} tensor element(s), found {cells}"
+        ),
+        span,
+    ))
+}
+
+fn tensor_cell_count(shape: &[usize]) -> usize {
+    shape.iter().copied().fold(1_usize, usize::saturating_mul)
+}
+
+fn expect_same_shape(
+    builtin: &str,
+    left: &[usize],
+    right: &[usize],
+    left_span: SourceSpan,
+    right_span: SourceSpan,
+) -> Result<(), CoreError> {
+    if left == right {
+        return Ok(());
+    }
+
+    Err(CoreError::with_labels(
+        format!(
+            "{builtin} shape mismatch: left {}, right {}",
+            display_exact_shape(left),
+            display_exact_shape(right)
+        ),
+        right_span.clone(),
+        vec![
+            CoreLabel::new(left_span, "left shape"),
+            CoreLabel::new(right_span, "right shape"),
+        ],
+    ))
+}
+
+fn expr_shape(expr: &SpannedExpr, env: &TypeEnv) -> Result<Option<ArrayShape>, CoreError> {
+    match &expr.node {
+        Expr::Array(_) => Ok(array_literal_shape(expr)),
+        Expr::Var(name) => Ok(env.shape(name).cloned()),
+        Expr::Index { target, indices } => {
+            let place = Place::with_indices(target.clone(), indices.clone());
+            Ok(Some(shape_after_place(&place, env)))
+        }
+        Expr::Call { name, args } => Ok(Some(
+            tensor_call_shape(name, args, env, expr.span.clone())?
+                .into_iter()
+                .map(Some)
+                .collect(),
+        )),
+        Expr::Int { .. }
+        | Expr::Bool(_)
+        | Expr::Nil
+        | Expr::Empty { .. }
+        | Expr::Top { .. }
+        | Expr::Size { .. }
+        | Expr::Unary { .. }
+        | Expr::Binary { .. } => Ok(None),
+    }
+}
+
+fn exact_shape(shape: &ArrayShape) -> Option<Vec<usize>> {
+    shape.iter().copied().collect()
+}
+
+fn display_shape(shape: &ArrayShape) -> String {
+    exact_shape(shape)
+        .map(|shape| display_exact_shape(&shape))
+        .unwrap_or_else(|| {
+            let dims = shape
+                .iter()
+                .map(|dim| dim.map_or("?".to_owned(), |dim| dim.to_string()))
+                .collect::<Vec<_>>()
+                .join("x");
+            format!("[{dims}]")
+        })
+}
+
+fn display_exact_shape(shape: &[usize]) -> String {
+    format!(
+        "[{}]",
+        shape
+            .iter()
+            .map(|dim| dim.to_string())
+            .collect::<Vec<_>>()
+            .join("x")
+    )
 }
 
 fn place_type(place: &Place, env: &TypeEnv, span: SourceSpan) -> Result<TypeInfo, CoreError> {
@@ -1768,12 +2675,16 @@ fn check_stmt_literal_bounds(
             Ok(())
         }
         Stmt::Declare {
-            name, dims, init, ..
+            name,
+            ty,
+            dims,
+            init,
+            ..
         } => {
             if let Some(init) = init {
                 check_expr_literal_bounds(init, shapes)?;
             }
-            let shape = shape_from_declared_dims(dims);
+            let shape = declared_shape_from_dims_and_type(dims, Some(ty));
             if shape.is_empty() {
                 shapes.remove(name);
             } else {
@@ -1783,6 +2694,7 @@ fn check_stmt_literal_bounds(
         }
         Stmt::Local {
             name,
+            ty,
             dims,
             init,
             body,
@@ -1790,7 +2702,10 @@ fn check_stmt_literal_bounds(
             ..
         } => {
             check_expr_literal_bounds(init, shapes)?;
-            let previous = shapes.insert(name.clone(), shape_from_local_dims_and_init(dims, init));
+            let previous = shapes.insert(
+                name.clone(),
+                shape_from_local_dims_type_and_init(dims, ty.as_ref(), init),
+            );
             check_stmt_literal_bounds(body, shapes, procedures, visiting)?;
             check_expr_literal_bounds(delocal, shapes)?;
             if let Some(previous) = previous {
@@ -1818,6 +2733,12 @@ fn check_expr_literal_bounds(expr: &SpannedExpr, shapes: &ShapeEnv) -> Result<()
         Expr::Binary { left, right, .. } => {
             check_expr_literal_bounds(left, shapes)?;
             check_expr_literal_bounds(right, shapes)
+        }
+        Expr::Call { args, .. } => {
+            for arg in args {
+                check_expr_literal_bounds(arg, shapes)?;
+            }
+            Ok(())
         }
     }
 }
@@ -2203,6 +3124,400 @@ mod tests {
     }
 
     #[test]
+    fn accepts_tensor_matmul_update() {
+        let program = parse_program(
+            "global x: tensor<int, 2, 3>;
+             global w: tensor<int, 3, 2>;
+             global y: tensor<int, 2, 2>;
+             y += matmul(x, w)",
+        )
+        .expect("program parses");
+
+        check_program(&program).expect("program checks");
+    }
+
+    #[test]
+    fn accepts_tensor_builtins_for_fixed_array_declarations() {
+        let program = parse_program(
+            "int x[2][3]
+             int w[3][2]
+             int y[2][2]
+             y += matmul(x, w)",
+        )
+        .expect("program parses");
+
+        check_program(&program).expect("program checks");
+    }
+
+    #[test]
+    fn accepts_witness_tensor_shape_metadata() {
+        let program = parse_program(
+            "global x: tensor<int, 2>;
+             global trace: witness<tensor<int, 2>>;
+             trace += x",
+        )
+        .expect("program parses");
+
+        check_program(&program).expect("witness tensor shape checks");
+    }
+
+    #[test]
+    fn accepts_tensor_clamp_preprocessing_builtin() {
+        let program = parse_program(
+            "global raw: tensor<int, 4>;
+             global clipped: tensor<int, 4>;
+             global residual: witness<tensor<int, 4>>;
+             clipped += clamp_q31(raw, -1073741824, 1073741824);
+             residual += raw;
+             residual -= clipped",
+        )
+        .expect("program parses");
+
+        check_program(&program).expect("clamp preprocessing program checks");
+    }
+
+    #[test]
+    fn accepts_q31_normalize_preprocessing_builtin() {
+        let program = parse_program(
+            "global raw: tensor<int, 4>;
+             global mean: tensor<int, 4>;
+             global inv_scale: tensor<int, 4>;
+             global features: tensor<int, 4>;
+             features += normalize_q31(raw, mean, inv_scale)",
+        )
+        .expect("program parses");
+
+        check_program(&program).expect("normalize preprocessing program checks");
+    }
+
+    #[test]
+    fn accepts_bit_pack_preprocessing_builtin() {
+        let program = parse_program(
+            "global flags: tensor<int, 8>;
+             global packed;
+             global unpacked: witness<tensor<int, 8>>;
+             packed += pack_bits(flags);
+             unpacked += unpack_bits(packed, 8)",
+        )
+        .expect("program parses");
+
+        check_program(&program).expect("bit packing preprocessing program checks");
+    }
+
+    #[test]
+    fn accepts_inference_margin_signal_builtins() {
+        let program = parse_program(
+            "global logits: tensor<int, 10>;
+             global prediction;
+             global runner_up_class;
+             global top_classes: tensor<int, 3>;
+             global top_values: tensor<int, 3>;
+             global margin;
+             global label_rank;
+             global top2_correct;
+             prediction += argmax(logits);
+             runner_up_class += runner_up(logits);
+             top_classes += top_k_indices(logits, 3);
+             top_values += top_k_values(logits, 3);
+             margin += top2_margin(logits);
+             label_rank += rank_of(logits, 7);
+             top2_correct += top_k_contains(logits, 7, 2)",
+        )
+        .expect("program parses");
+
+        check_program(&program).expect("inference margin signal program checks");
+    }
+
+    #[test]
+    fn rejects_nested_witness_annotations() {
+        let program =
+            parse_program("global trace: witness<witness<int>>; skip").expect("program parses");
+        let error = check_program(&program).expect_err("nested witness is rejected");
+
+        assert!(error.to_string().contains("nested witness"));
+    }
+
+    #[test]
+    fn accepts_mnist_reversible_identify_and_train_step() {
+        let program = parse_program(
+            "global image: tensor<int, 784>;
+             global weights: tensor<int, 784, 10>;
+             global bias: tensor<int, 10>;
+             global logits: witness<tensor<int, 10>>;
+             global error: witness<tensor<int, 10>>;
+             global prediction;
+             global correct;
+             global label;
+             global lr;
+             logits += vecmat_q31(image, weights);
+             logits += bias;
+             prediction += argmax(logits);
+             correct += argmax_eq(logits, label);
+             error += logits;
+             error -= one_hot_q31(label, 10);
+             weights -= scale_q31(outer_q31(image, error), lr);
+             bias -= scale_q31(error, lr)",
+        )
+        .expect("program parses");
+
+        check_program(&program).expect("program checks");
+    }
+
+    #[test]
+    fn accepts_mnist_witness_tape_subplace_updates() {
+        let program = parse_program(
+            "global images: tensor<int, 2, 784>;
+             global labels: tensor<int, 2>;
+             global weights: tensor<int, 784, 10>;
+             global bias: tensor<int, 10>;
+             global logits_tape: witness<tensor<int, 2, 10>>;
+             global error_tape: witness<tensor<int, 2, 10>>;
+             global prediction_tape: witness<tensor<int, 2>>;
+             global correct_tape: witness<tensor<int, 2>>;
+             global lr;
+             logits_tape[0] += vecmat_q31(images[0], weights);
+             logits_tape[0] += bias;
+             prediction_tape[0] += argmax(logits_tape[0]);
+             correct_tape[0] += argmax_eq(logits_tape[0], labels[0]);
+             error_tape[0] += logits_tape[0];
+             error_tape[0] -= one_hot_q31(labels[0], 10);
+             weights -= scale_q31(outer_q31(images[0], error_tape[0]), lr);
+             bias -= scale_q31(error_tape[0], lr)",
+        )
+        .expect("program parses");
+
+        check_program(&program).expect("program checks");
+    }
+
+    #[test]
+    fn accepts_mnist_witness_tape_iterate_updates() {
+        let program = parse_program(
+            "global images: tensor<int, 2, 784>;
+             global labels: tensor<int, 2>;
+             global weights: tensor<int, 784, 10>;
+             global bias: tensor<int, 10>;
+             global logits_tape: witness<tensor<int, 2, 10>>;
+             global error_tape: witness<tensor<int, 2, 10>>;
+             global prediction_tape: witness<tensor<int, 2>>;
+             global correct_tape: witness<tensor<int, 2>>;
+             global lr;
+             iterate int sample = 0 to len(labels) - 1
+               logits_tape[sample] += vecmat_q31(images[sample], weights);
+               logits_tape[sample] += bias;
+               prediction_tape[sample] += argmax(logits_tape[sample]);
+               correct_tape[sample] += argmax_eq(logits_tape[sample], labels[sample]);
+               error_tape[sample] += logits_tape[sample];
+               error_tape[sample] -= one_hot_q31(labels[sample], 10);
+               weights -= scale_q31(outer_q31(images[sample], error_tape[sample]), lr);
+               bias -= scale_q31(error_tape[sample], lr)
+             end",
+        )
+        .expect("program parses");
+
+        check_program(&program).expect("program checks");
+    }
+
+    #[test]
+    fn accepts_mnist_mlp_witness_trace() {
+        let program = parse_program(
+            "global images: tensor<int, 2, 784>;
+             global labels: tensor<int, 2>;
+             global w1: tensor<int, 784, 16>;
+             global b1: tensor<int, 16>;
+             global hidden_pre_tape: witness<tensor<int, 2, 16>>;
+             global hidden_mask_tape: witness<tensor<int, 2, 16>>;
+             global hidden_tape: witness<tensor<int, 2, 16>>;
+             global w2: tensor<int, 16, 10>;
+             global b2: tensor<int, 10>;
+             global logits_tape: witness<tensor<int, 2, 10>>;
+             global out_error_tape: witness<tensor<int, 2, 10>>;
+             global hidden_back_tape: witness<tensor<int, 2, 16>>;
+             global hidden_delta_tape: witness<tensor<int, 2, 16>>;
+             global prediction_tape: witness<tensor<int, 2>>;
+             global correct_tape: witness<tensor<int, 2>>;
+             global lr;
+             iterate int sample = 0 to len(labels) - 1
+               hidden_pre_tape[sample] += vecmat_q31(images[sample], w1);
+               hidden_pre_tape[sample] += b1;
+               hidden_mask_tape[sample] += relu_mask_q31(hidden_pre_tape[sample]);
+               hidden_tape[sample] += relu(hidden_pre_tape[sample]);
+               logits_tape[sample] += vecmat_q31(hidden_tape[sample], w2);
+               logits_tape[sample] += b2;
+               prediction_tape[sample] += argmax(logits_tape[sample]);
+               correct_tape[sample] += argmax_eq(logits_tape[sample], labels[sample]);
+               out_error_tape[sample] += logits_tape[sample];
+               out_error_tape[sample] -= one_hot_q31(labels[sample], 10);
+               hidden_back_tape[sample] += matvec_q31(w2, out_error_tape[sample]);
+               hidden_delta_tape[sample] += hadamard_q31(hidden_back_tape[sample], hidden_mask_tape[sample]);
+               w2 -= scale_q31(outer_q31(hidden_tape[sample], out_error_tape[sample]), lr);
+               b2 -= scale_q31(out_error_tape[sample], lr);
+               w1 -= scale_q31(outer_q31(images[sample], hidden_delta_tape[sample]), lr);
+               b1 -= scale_q31(hidden_delta_tape[sample], lr)
+             end",
+        )
+        .expect("program parses");
+
+        check_program(&program).expect("program checks");
+    }
+
+    #[test]
+    fn rejects_one_hot_without_constant_class_count() {
+        let program = parse_program(
+            "global label;
+             global classes;
+             global target: tensor<int, 10>;
+             target += one_hot(label, classes)",
+        )
+        .expect("program parses");
+        let error = check_program(&program).expect_err("class count must be static");
+
+        assert!(error.to_string().contains("constant positive int"));
+    }
+
+    #[test]
+    fn rejects_tensor_clamp_reversed_constant_bounds() {
+        let program = parse_program(
+            "global x: tensor<int, 2>;
+             global y: tensor<int, 2>;
+             y += clamp_q31(x, 10, -10)",
+        )
+        .expect("program parses");
+        let error = check_program(&program).expect_err("bounds are invalid");
+
+        assert!(
+            error
+                .to_string()
+                .contains("lower bound 10 exceeds upper bound -10")
+        );
+    }
+
+    #[test]
+    fn rejects_pack_bits_too_wide() {
+        let program = parse_program(
+            "global bits: tensor<int, 64>;
+             global packed;
+             packed += pack_bits(bits)",
+        )
+        .expect("program parses");
+        let error = check_program(&program).expect_err("packed bit width is bounded");
+
+        assert!(error.to_string().contains("supports at most 63 bits"));
+    }
+
+    #[test]
+    fn rejects_q31_normalize_shape_mismatch() {
+        let program = parse_program(
+            "global raw: tensor<int, 4>;
+             global mean: tensor<int, 3>;
+             global inv_scale: tensor<int, 4>;
+             global features: tensor<int, 4>;
+             features += normalize_q31(raw, mean, inv_scale)",
+        )
+        .expect("program parses");
+        let error = check_program(&program).expect_err("normalization shapes must match");
+
+        assert!(error.to_string().contains("shape mismatch"));
+    }
+
+    #[test]
+    fn rejects_unpack_bits_without_constant_width() {
+        let program = parse_program(
+            "global packed;
+             global width;
+             global bits: tensor<int, 8>;
+             bits += unpack_bits(packed, width)",
+        )
+        .expect("program parses");
+        let error = check_program(&program).expect_err("unpack width must be static");
+
+        assert!(error.to_string().contains("constant positive int"));
+    }
+
+    #[test]
+    fn rejects_top2_margin_without_two_static_entries() {
+        let program = parse_program(
+            "global logits: tensor<int, 1>;
+             global margin;
+             margin += top2_margin(logits)",
+        )
+        .expect("program parses");
+        let error = check_program(&program).expect_err("top2 margin needs two entries");
+
+        assert!(
+            error
+                .to_string()
+                .contains("expected at least 2 tensor element(s)")
+        );
+    }
+
+    #[test]
+    fn rejects_top_k_width_above_static_tensor_entries() {
+        let program = parse_program(
+            "global logits: tensor<int, 3>;
+             global top_classes: tensor<int, 4>;
+             top_classes += top_k_indices(logits, 4)",
+        )
+        .expect("program parses");
+        let error = check_program(&program).expect_err("top-k width is bounded by input cells");
+
+        assert!(error.to_string().contains("must be <= tensor cell count 3"));
+    }
+
+    #[test]
+    fn rejects_top_k_contains_width_above_static_tensor_entries() {
+        let program = parse_program(
+            "global logits: tensor<int, 3>;
+             global ok;
+             ok += top_k_contains(logits, 1, 4)",
+        )
+        .expect("program parses");
+        let error = check_program(&program).expect_err("top-k contains width is bounded");
+
+        assert!(error.to_string().contains("must be <= tensor cell count 3"));
+    }
+
+    #[test]
+    fn rejects_tensor_matmul_dimension_mismatch() {
+        let program = parse_program(
+            "global x: tensor<int, 2, 3>;
+             global w: tensor<int, 2, 2>;
+             global y: tensor<int, 2, 2>;
+             y += matmul(x, w)",
+        )
+        .expect("program parses");
+        let error = check_program(&program).expect_err("program has incompatible shapes");
+
+        assert!(error.to_string().contains("inner dimension mismatch"));
+    }
+
+    #[test]
+    fn rejects_tensor_builtin_without_static_shape() {
+        let program = parse_program(
+            "global y: tensor<int, 2, 2>;
+             y += transpose(xs)",
+        )
+        .expect("program parses");
+        let xs_ty = parse_type_expr("array<array<int>>").expect("type parses");
+        let error = check_program_with_types(&program, [("xs".to_owned(), xs_ty)])
+            .expect_err("program has unknown tensor shape");
+
+        assert!(error.to_string().contains("statically known shape"));
+    }
+
+    #[test]
+    fn rejects_tensor_update_that_reads_its_target() {
+        let program = parse_program(
+            "proc bad(x: tensor<int, 2>, y: tensor<int, 2>) {
+                x += hadamard(x, y)
+            }",
+        )
+        .expect("program parses");
+        let error = check_program(&program).expect_err("program is irreversible");
+
+        assert!(error.to_string().contains("reads the value being changed"));
+    }
+
+    #[test]
     fn rejects_update_that_reads_same_computed_constant_array_cell() {
         let program = parse_program("xs[1 + 1] += xs[2]").expect("program parses");
         let error = check_program(&program).expect_err("program is irreversible");
@@ -2223,6 +3538,19 @@ mod tests {
         let error = check_program(&program).expect_err("dynamic cell aliasing is rejected");
 
         assert!(error.to_string().contains("reads the value being changed"));
+    }
+
+    #[test]
+    fn compatibility_options_allow_janus_style_update_aliases() {
+        let program = parse_program("xs[0] += xs[i]").expect("program parses");
+
+        check_program_with_options(
+            &program,
+            CheckOptions {
+                allow_update_aliases: true,
+            },
+        )
+        .expect("compatibility mode allows Janus-style update aliases");
     }
 
     #[test]

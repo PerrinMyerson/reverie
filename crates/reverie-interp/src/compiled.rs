@@ -7,7 +7,8 @@ use reverie_syntax::{
 };
 
 use crate::{
-    IoState, RuntimeError, State, Value, format_printf_observation, format_show_observation,
+    ExecutionOptions, IoState, RuntimeError, State, Value, eval_tensor_builtin_values,
+    format_printf_observation, format_show_observation,
 };
 
 #[derive(Debug, Clone)]
@@ -15,10 +16,19 @@ pub struct CompiledProgram {
     globals: Vec<CGlobal>,
     top: CompiledScope,
     procedures: Vec<CompiledProcedure>,
+    options: ExecutionOptions,
 }
 
 impl CompiledProgram {
     pub fn for_state(program: &Program, initial_state: &State) -> Result<Self, RuntimeError> {
+        Self::for_state_with_options(program, initial_state, ExecutionOptions::default())
+    }
+
+    pub fn for_state_with_options(
+        program: &Program,
+        initial_state: &State,
+        options: ExecutionOptions,
+    ) -> Result<Self, RuntimeError> {
         let mut top_layout = SlotLayout::default();
         for global in &program.globals {
             top_layout.ensure(&global.name);
@@ -103,6 +113,7 @@ impl CompiledProgram {
                 body: top_body,
             },
             procedures,
+            options,
         })
     }
 
@@ -162,13 +173,13 @@ impl CompiledProgram {
                 expr,
                 alias_check,
             } => {
-                if *alias_check {
+                if *alias_check && !self.options.allow_update_aliases {
                     ensure_update_rhs_does_not_read_target(target, expr, state)?;
                 }
                 match op {
                     UpdateOp::Add | UpdateOp::Sub => {
-                        let rhs = eval_int(expr, state)?;
-                        update_place_int(target, state, *op, rhs)
+                        let rhs = eval(expr, state)?;
+                        update_place_add_sub(target, state, *op, rhs)
                     }
                     UpdateOp::Xor => {
                         let rhs = eval(expr, state)?;
@@ -563,26 +574,58 @@ impl CompiledProgram {
 }
 
 pub fn execute_compiled(program: &Program, state: State) -> Result<State, RuntimeError> {
-    let compiled = CompiledProgram::for_state(program, &state)?;
+    execute_compiled_with_options(program, state, ExecutionOptions::default())
+}
+
+pub fn execute_compiled_with_options(
+    program: &Program,
+    state: State,
+    options: ExecutionOptions,
+) -> Result<State, RuntimeError> {
+    let compiled = CompiledProgram::for_state_with_options(program, &state, options)?;
     compiled.execute(state)
 }
 
 pub fn execute_compiled_io(program: &Program, state: IoState) -> Result<IoState, RuntimeError> {
-    let compiled = CompiledProgram::for_state(program, state.store())?;
+    execute_compiled_io_with_options(program, state, ExecutionOptions::default())
+}
+
+pub fn execute_compiled_io_with_options(
+    program: &Program,
+    state: IoState,
+    options: ExecutionOptions,
+) -> Result<IoState, RuntimeError> {
+    let compiled = CompiledProgram::for_state_with_options(program, state.store(), options)?;
     compiled.execute_io(state)
 }
 
 pub fn execute_compiled_backward(program: &Program, state: State) -> Result<State, RuntimeError> {
+    execute_compiled_backward_with_options(program, state, ExecutionOptions::default())
+}
+
+pub fn execute_compiled_backward_with_options(
+    program: &Program,
+    state: State,
+    options: ExecutionOptions,
+) -> Result<State, RuntimeError> {
     let inverse = reverie_core::invert_program(program);
-    execute_compiled(&inverse, state)
+    execute_compiled_with_options(&inverse, state, options)
 }
 
 pub fn execute_compiled_io_backward(
     program: &Program,
     state: IoState,
 ) -> Result<IoState, RuntimeError> {
+    execute_compiled_io_backward_with_options(program, state, ExecutionOptions::default())
+}
+
+pub fn execute_compiled_io_backward_with_options(
+    program: &Program,
+    state: IoState,
+    options: ExecutionOptions,
+) -> Result<IoState, RuntimeError> {
     let inverse = reverie_core::invert_program(program);
-    execute_compiled_io(&inverse, state)
+    execute_compiled_io_with_options(&inverse, state, options)
 }
 
 #[derive(Debug, Clone)]
@@ -811,6 +854,10 @@ enum CExprKind {
         left: Box<CExpr>,
         right: Box<CExpr>,
     },
+    Call {
+        name: String,
+        args: Vec<CExpr>,
+    },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -952,6 +999,7 @@ fn default_value(dims: &[usize], ty: Option<&TypeExpr>) -> Result<Value, Runtime
     if let Some((len, rest)) = dims.split_first() {
         let element_ty = match ty {
             Some(TypeExpr::Array { element }) => Some(&element.node),
+            Some(TypeExpr::Witness { inner }) => Some(&inner.node),
             other => other,
         };
         return (0..*len)
@@ -963,6 +1011,8 @@ fn default_value(dims: &[usize], ty: Option<&TypeExpr>) -> Result<Value, Runtime
     match ty {
         Some(TypeExpr::Stack) => Ok(Value::Stack(Vec::new())),
         Some(TypeExpr::Array { element }) => default_value(&[1], Some(&element.node)),
+        Some(TypeExpr::Tensor { element, shape }) => default_value(shape, Some(&element.node)),
+        Some(TypeExpr::Witness { inner }) => default_value(&[], Some(&inner.node)),
         Some(TypeExpr::Bool) => Ok(Value::Bool(false)),
         Some(TypeExpr::Int { .. }) | None => Ok(Value::Int(0)),
     }
@@ -999,6 +1049,7 @@ fn validate_declared_value(
     if let Some((len, rest)) = dims.split_first() {
         let element_ty = match ty {
             Some(TypeExpr::Array { element }) => Some(&element.node),
+            Some(TypeExpr::Witness { inner }) => Some(&inner.node),
             other => other,
         };
         match value {
@@ -1033,6 +1084,12 @@ fn validate_declared_value(
             }
             validate_rectangular_declared_array(name, values)?;
             Ok(())
+        }
+        (Some(TypeExpr::Tensor { element, shape }), value) => {
+            validate_declared_value(name, shape, Some(&element.node), value)
+        }
+        (Some(TypeExpr::Witness { inner }), value) => {
+            validate_declared_value(name, &[], Some(&inner.node), value)
         }
         (Some(TypeExpr::Bool), other) => Err(RuntimeError::new(format!(
             "declaration `{name}` expected bool, found {other}"
@@ -1644,6 +1701,11 @@ fn collect_expr_roots(expr: &CExpr, roots: &mut Vec<String>) {
             collect_expr_roots(left, roots);
             collect_expr_roots(right, roots);
         }
+        CExprKind::Call { args, .. } => {
+            for arg in args {
+                collect_expr_roots(arg, roots);
+            }
+        }
     }
 }
 
@@ -2057,6 +2119,13 @@ fn compile_expr(expr: &SpannedExpr, layout: &SlotLayout) -> Result<CExpr, Runtim
             left: Box::new(compile_expr(left, layout)?),
             right: Box::new(compile_expr(right, layout)?),
         },
+        Expr::Call { name, args } => CExprKind::Call {
+            name: name.clone(),
+            args: args
+                .iter()
+                .map(|arg| compile_expr(arg, layout))
+                .collect::<Result<Vec<_>, _>>()?,
+        },
     };
 
     Ok(CExpr {
@@ -2216,6 +2285,11 @@ fn collect_expr_names(expr: &SpannedExpr, layout: &mut SlotLayout) {
             collect_expr_names(left, layout);
             collect_expr_names(right, layout);
         }
+        Expr::Call { args, .. } => {
+            for arg in args {
+                collect_expr_names(arg, layout);
+            }
+        }
     }
 }
 
@@ -2241,6 +2315,7 @@ fn expr_may_alias_place(place: &CPlace, expr: &CExpr) -> bool {
         CExprKind::Binary { left, right, .. } => {
             expr_may_alias_place(place, left) || expr_may_alias_place(place, right)
         }
+        CExprKind::Call { args, .. } => args.iter().any(|arg| expr_may_alias_place(place, arg)),
     }
 }
 
@@ -2307,7 +2382,8 @@ fn const_int_value(expr: &CExpr) -> Option<i64> {
         | CExprKind::Index { .. }
         | CExprKind::Empty { .. }
         | CExprKind::Top { .. }
-        | CExprKind::Size { .. } => None,
+        | CExprKind::Size { .. }
+        | CExprKind::Call { .. } => None,
         CExprKind::Unary { .. } => None,
     }
 }
@@ -2347,6 +2423,13 @@ fn eval(expr: &CExpr, state: &SlotState) -> Result<Value, RuntimeError> {
         } => eval_size(target, *target_slot, expr.span.clone(), state),
         CExprKind::Unary { op, expr } => eval_unary(*op, expr, state),
         CExprKind::Binary { op, left, right } => eval_binary(*op, left, right, state),
+        CExprKind::Call { name, args } => {
+            let values = args
+                .iter()
+                .map(|arg| eval(arg, state))
+                .collect::<Result<Vec<_>, _>>()?;
+            eval_tensor_builtin_values(name, values, expr.span.clone())
+        }
     }
 }
 
@@ -2697,19 +2780,47 @@ fn expect_place_int(place: &CPlace, state: &SlotState) -> Result<i64, RuntimeErr
     }
 }
 
-fn update_place_int(
+fn update_place_add_sub(
     place: &CPlace,
     state: &mut SlotState,
     op: UpdateOp,
-    rhs: i64,
+    rhs: Value,
 ) -> Result<(), RuntimeError> {
-    let current = place_int_mut(place, state)?;
-    *current = match op {
-        UpdateOp::Add => current.wrapping_add(rhs),
-        UpdateOp::Sub => current.wrapping_sub(rhs),
-        UpdateOp::Xor => *current ^ rhs,
-    };
-    Ok(())
+    let display = display_place(place);
+    let target = place_value_mut(place, state)?;
+    update_add_sub_value_in_place(target, &rhs, op, &display)
+}
+
+fn update_add_sub_value_in_place(
+    current: &mut Value,
+    rhs: &Value,
+    op: UpdateOp,
+    display: &str,
+) -> Result<(), RuntimeError> {
+    match (current, rhs) {
+        (Value::Int(current), Value::Int(rhs)) => {
+            *current = match op {
+                UpdateOp::Add => current.wrapping_add(*rhs),
+                UpdateOp::Sub => current.wrapping_sub(*rhs),
+                UpdateOp::Xor => unreachable!("xor update handled separately"),
+            };
+            Ok(())
+        }
+        (Value::Array(current), Value::Array(rhs)) if current.len() == rhs.len() => {
+            for (current, rhs) in current.iter_mut().zip(rhs) {
+                update_add_sub_value_in_place(current, rhs, op, display)?;
+            }
+            Ok(())
+        }
+        (Value::Array(current), Value::Array(rhs)) => Err(RuntimeError::new(format!(
+            "tensor update at `{display}` has shape mismatch: target length {}, right-hand side length {}",
+            current.len(),
+            rhs.len()
+        ))),
+        (current, rhs) => Err(RuntimeError::new(format!(
+            "expected matching int or int tensor operands for add/sub update at `{display}`, found {current} and {rhs}"
+        ))),
+    }
 }
 
 fn update_place_xor(place: &CPlace, state: &mut SlotState, rhs: Value) -> Result<(), RuntimeError> {
@@ -2725,27 +2836,6 @@ fn update_place_xor(place: &CPlace, state: &mut SlotState, rhs: Value) -> Result
         }
         (current, rhs) => Err(RuntimeError::new(format!(
             "expected matching int or bool operands for xor update, found {current} and {rhs} at `{display}`"
-        ))),
-    }
-}
-
-fn place_int_mut<'a>(
-    place: &CPlace,
-    state: &'a mut SlotState,
-) -> Result<&'a mut i64, RuntimeError> {
-    let display = display_place(place);
-    match place_value_mut(place, state)? {
-        Value::Int(value) => Ok(value),
-        Value::Bool(value) => Err(RuntimeError::new(format!(
-            "expected `{display}` to be int, found bool `{value}`"
-        ))),
-        Value::Array(value) => Err(RuntimeError::new(format!(
-            "expected `{display}` to be int, found array with {} element(s)",
-            value.len()
-        ))),
-        Value::Stack(value) => Err(RuntimeError::new(format!(
-            "expected `{display}` to be int, found stack with {} element(s)",
-            value.len()
         ))),
     }
 }
@@ -2946,6 +3036,11 @@ fn collect_read_places(
         CExprKind::Binary { left, right, .. } => {
             collect_read_places(left, state, reads)?;
             collect_read_places(right, state, reads)?;
+        }
+        CExprKind::Call { args, .. } => {
+            for arg in args {
+                collect_read_places(arg, state, reads)?;
+            }
         }
     }
 

@@ -56,6 +56,9 @@ statically proven different. Swaps apply the same
 idea to both mutated roots: `xs[i] <=> i` is rejected because the inverse could
 otherwise look at a different element. The checker also rejects local
 initializers and delocal assertions that mention the local variable itself.
+The CLI's `--legacy-janus` mode relaxes only the update-alias part of this rule
+so upstream Jana programs with self-dependent array updates can be checked and
+benchmarked explicitly as compatibility code.
 
 Procedures use a no-alias call model in v1: duplicate by-reference arguments
 and potentially duplicate same-root element arguments are rejected rather than
@@ -93,6 +96,17 @@ fi swapped != 0
 The witness doubles as the conditional exit assertion, so the inverse can pick
 the correct branch without a hidden history log. See `docs/injectivization.md`
 for the full walkthrough.
+
+Witnesses are not the only ML route. Some model layers are designed to be
+invertible without a trace because they are built from reversible updates.
+`examples/invertible_coupling.rev` shows this with an additive coupling block:
+one activation half updates the other, then the second half updates the first.
+Backward execution mechanically undoes those updates in reverse order, so the
+layer itself needs no logits/error tape.
+`examples/triangular_residual.rev` shows the same no-witness idea for a
+triangular residual block: each coordinate is updated from later coordinates
+only, and reverse execution restores those later coordinates before subtracting
+the residual terms.
 
 ## Backward Execution
 

@@ -64,6 +64,32 @@ delocal distances = [1<m>, 5<m>]
 
 See `examples/array_units.rev` for a runnable version.
 
+Tensor annotations add a fixed shape directly to the type while keeping the
+same nested-array runtime representation:
+
+```rev
+global x: tensor<int, 2, 3> = [[1, 2, 3], [4, 5, 6]];
+global w: tensor<int, 3, 2> = [[7, 8], [9, 10], [11, 12]];
+global y: tensor<int, 2, 2>;
+
+procedure main() {
+  y += matmul(x, w)
+}
+```
+
+Tensor v1 supports dimensionless integer elements, exact shapes, and no
+broadcasting. Whole-tensor `+=` and `-=` updates require matching statically
+known shapes. The builtins are `matmul`, `matmul_q31`, `matvec`,
+`matvec_q31`, `vecmat`, `vecmat_q31`, `dot`, `dot_q31`, `hadamard`,
+`hadamard_q31`, `outer`, `outer_q31`, `scale`, `scale_q31`, `clamp`,
+`clamp_q31`, `normalize_q31`, `pack_bits`, `unpack_bits`, `transpose`, `sum`,
+`relu_mask_q31`, `relu`, `argmax`, `runner_up`, `top2_margin`, `rank_of`,
+`top_k_indices`, `top_k_values`, `top_k_contains`, `argmax_eq`, `one_hot`, and `one_hot_q31`. The `_q31`
+variants use the same fixed-point multiply as `*/`. See
+`examples/tensor_linear.rev` for a runnable integer and Q31 example, and
+`examples/mnist_reversible_step.rev` for a full MNIST-shaped reversible
+classifier/training step.
+
 Top-level arrays are seeded through the CLI:
 
 ```sh
@@ -113,9 +139,11 @@ The same no-destruction rule applies, but it is cell-sensitive. For
 `xs[i] += e`, the index expression must not mention `xs`, because the inverse
 must be able to find the same element after the value changes. The right-hand
 side may read another cell from the same array when the checker can prove the
-locations differ, such as `xs[0] += xs[1]`. The checker rejects exact same-cell
-reads such as `xs[0] += xs[0]`, and it rejects runtime-dependent same-root
-reads such as `xs[i] += xs[j]` because those locations may alias.
+locations differ, such as `xs[0] += xs[1]`. In strict mode the checker rejects
+exact same-cell reads such as `xs[0] += xs[0]`, and it rejects
+runtime-dependent same-root reads such as `xs[i] += xs[j]` because those
+locations may alias. `--legacy-janus` permits these update aliases for upstream
+Jana compatibility, while keeping the strict rule as Reverie's default.
 
 For swaps, index expressions must not mention either mutated root. For example,
 `xs[i] <=> i` is rejected: after the swap, `i` may hold a different value, so

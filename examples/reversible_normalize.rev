@@ -1,0 +1,14 @@
+// Reversible Q31 normalization recipe for deterministic ML preprocessing.
+//
+// `features` accumulates (raw - mean) */ inv_scale while `raw`, `mean`, and
+// `inv_scale` stay intact. Running backward subtracts the same normalized view
+// and clears `features` exactly.
+
+global raw: tensor<int, 4> = [2147483648, 1073741824, -1073741824, 0];
+global mean: tensor<int, 4> = [1073741824, 0, -2147483648, -1073741824];
+global inv_scale: tensor<int, 4> = [1073741824, 2147483648, 1073741824, 2147483648];
+global features: tensor<int, 4>;
+
+procedure main() {
+  features += normalize_q31(raw, mean, inv_scale)
+}

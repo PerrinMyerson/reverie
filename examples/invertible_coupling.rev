@@ -1,0 +1,32 @@
+// Invertible additive coupling block for reversible ML layers.
+//
+// This is a RevNet-style pattern: split an activation into two halves, update
+// one half from a pure function of the other, then update the other half from
+// the new value. No witness tape is needed for the block itself because each
+// update is reversible and its source half is available when running backward.
+
+global left: tensor<int, 4> = [2147483648, -1073741824, 536870912, -536870912];
+global right: tensor<int, 4> = [0, 1073741824, -536870912, 536870912];
+
+global f_w: tensor<int, 4, 4> = [
+  [2147483648, 0, 0, 0],
+  [0, 2147483648, 0, 0],
+  [0, 0, 2147483648, 0],
+  [0, 0, 0, 2147483648],
+];
+global f_b: tensor<int, 4> = [0, 536870912, 0, -536870912];
+
+global g_w: tensor<int, 4, 4> = [
+  [1073741824, 0, 0, 0],
+  [0, 1073741824, 0, 0],
+  [0, 0, 1073741824, 0],
+  [0, 0, 0, 1073741824],
+];
+global g_b: tensor<int, 4> = [-536870912, 0, 536870912, 0];
+
+procedure main() {
+  right += vecmat_q31(left, f_w);
+  right += f_b;
+  left += vecmat_q31(right, g_w);
+  left += g_b
+}

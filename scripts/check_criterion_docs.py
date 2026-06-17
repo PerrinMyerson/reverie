@@ -32,6 +32,12 @@ IDENT_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
 SPECIAL_EXPECTED_FUNCTIONS = {
     "slot_compile_vs_execute_sort_n50": {"compile", "execute_compiled"},
     "scrub_timeline_sort_n50": {"build_timeline"},
+    "tensor_matmul_builtin_vs_loops_3x3": {
+        "explicit_tree_walk",
+        "builtin_tree_walk",
+        "explicit_slot_compiled",
+        "builtin_slot_compiled",
+    },
 }
 DEFAULT_EXPECTED_FUNCTIONS = {"tree_walk", "slot_compiled"}
 

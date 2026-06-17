@@ -28,11 +28,16 @@ If you have installed the binary, replace that prefix with `reverie`.
    `io.rev` for reversible Janus-style tape I/O.
 10. Try `bool_toggle.rev`, `bool_flags.rev`, `array.rev`, `size.rev`, `stack.rev`,
    `janus_stack_reverse.rev`,
-   `janus_sort.rev`, `matrix_transpose.rev`, `bit_reversal.rev`,
-   `perm_to_code.rev`,
-   `janus_automata.rev`, `janus_turing.rev`, `rle_compression.rev`,
-   `janus_root.rev`, and `janus_factor.rev` to see data structures and numeric
-   operations scale up into classic Janus-style reversible algorithms.
+   `janus_sort.rev`, `matrix_transpose.rev`, `tensor_linear.rev`,
+   `invertible_coupling.rev`, `triangular_residual.rev`, `reversible_preprocess.rev`,
+   `reversible_normalize.rev`, `reversible_clamp.rev`, `reversible_pack.rev`,
+   `reversible_inference_trace.rev`,
+   `mnist_identify.rev`, `mnist_reversible_step.rev`,
+   `mnist_witness_tape.rev`, `mnist_witness_tape_loop.rev`,
+   `mnist_mlp_witness.rev`, `bit_reversal.rev`, `perm_to_code.rev`,
+   `janus_automata.rev`, `janus_turing.rev`, `rle_compression.rev`, `janus_root.rev`, and
+   `janus_factor.rev` to see data structures and numeric operations scale up
+   into classic Janus-style reversible algorithms.
 11. Try `units.rev` and `refinement.rev` to tour the v1 safety
    layers.
 12. Run the negative examples when you want to see the diagnostics.
@@ -538,6 +543,518 @@ Expected outputs:
 {m = [[1, 2, 3], [4, 5, 6], [7, 8, 9]], n = 3}
 ```
 
+### `tensor_linear.rev`
+
+Shows array-backed tensor annotations and reversible tensor accumulation. The
+integer path computes a 2x3 by 3x2 matrix product; the Q31 path uses
+`matmul_q31`, which shares the fixed-point multiply semantics of `*/`.
+
+```sh
+cargo run -p reverie-cli -- run examples/tensor_linear.rev
+cargo run -p reverie-cli -- reverse examples/tensor_linear.rev \
+  --var 'y=[[58,64],[139,154]]' \
+  --var 'qy=[[1073741824]]'
+```
+
+Expected outputs include:
+
+```text
+y = [[58, 64], [139, 154]]
+qy = [[1073741824]]
+y = [[0, 0], [0, 0]]
+qy = [[0]]
+```
+
+### `invertible_coupling.rev`
+
+Shows a RevNet-style additive coupling block over two 4-wide Q31 activation
+halves. `right` is updated from `left`, then `left` is updated from the new
+`right`; the inverse runs those reversible updates backward without a witness
+tape for the layer itself.
+
+```sh
+cargo run -p reverie-cli -- run examples/invertible_coupling.rev
+cargo run -p reverie-cli -- reverse examples/invertible_coupling.rev \
+  --var 'left=[2684354560,-805306368,1073741824,-805306368]' \
+  --var 'right=[2147483648,536870912,0,-536870912]'
+```
+
+Expected outputs include:
+
+```text
+left = [2684354560, -805306368, 1073741824, -805306368]
+right = [2147483648, 536870912, 0, -536870912]
+left = [2147483648, -1073741824, 536870912, -536870912]
+right = [0, 1073741824, -536870912, 536870912]
+```
+
+### `triangular_residual.rev`
+
+Shows an invertible triangular residual block over one 4-wide Q31 activation.
+Earlier coordinates accumulate residual terms from later coordinates only. The
+inverse restores later coordinates first, then subtracts those same residuals,
+so the layer itself needs no witness tape.
+
+```sh
+cargo run -p reverie-cli -- run examples/triangular_residual.rev
+cargo run -p reverie-cli -- reverse examples/triangular_residual.rev \
+  --var 'x=[1610612736,-805306368,536870912,-671088640]'
+```
+
+Expected outputs include:
+
+```text
+x = [1610612736, -805306368, 536870912, -671088640]
+x = [2147483648, -1073741824, 536870912, -536870912]
+```
+
+### `reversible_preprocess.rev`
+
+Shows a reversible preprocessing block for small deterministic ML inputs. The
+raw Q31 sample stays intact while a separate `features` buffer accumulates a
+centered and permuted view. The inverse clears `features` exactly without a
+witness tape because the raw sample, mean vector, and swaps are still
+available.
+
+```sh
+cargo run -p reverie-cli -- run examples/reversible_preprocess.rev
+cargo run -p reverie-cli -- reverse examples/reversible_preprocess.rev \
+  --var 'features=[1073741824,-1073741824,1610612736,536870912]'
+```
+
+Expected outputs include:
+
+```text
+features = [1073741824, -1073741824, 1610612736, 536870912]
+features = [0, 0, 0, 0]
+```
+
+### `reversible_normalize.rev`
+
+Shows Q31 feature normalization as a replayable preprocessing step.
+`normalize_q31(raw, mean, inv_scale)` computes `(raw - mean) */ inv_scale`
+elementwise into a separate `features` tensor. The inverse clears `features`
+without touching the raw sample or normalization parameters.
+
+```sh
+cargo run -p reverie-cli -- run examples/reversible_normalize.rev
+cargo run -p reverie-cli -- reverse examples/reversible_normalize.rev \
+  --var 'features=[536870912,1073741824,536870912,1073741824]'
+```
+
+Expected outputs include:
+
+```text
+features = [536870912, 1073741824, 536870912, 1073741824]
+features = [0, 0, 0, 0]
+```
+
+### `reversible_clamp.rev`
+
+Shows how to make Q31 clipping auditable. `clamp_q31` produces the clipped
+feature view, while `residual` records `raw - clipped` as a witness. That keeps
+the saturated signal exact: backward execution clears the clipped view and
+residual while preserving the raw sample.
+
+```sh
+cargo run -p reverie-cli -- run examples/reversible_clamp.rev
+cargo run -p reverie-cli -- reverse examples/reversible_clamp.rev \
+  --var 'clipped=[-1073741824,-268435456,536870912,1073741824]' \
+  --var 'residual=[-1073741824,0,0,1073741824]'
+```
+
+Expected outputs include:
+
+```text
+clipped = [-1073741824, -268435456, 536870912, 1073741824]
+residual = [-1073741824, 0, 0, 1073741824]
+clipped = [0, 0, 0, 0]
+residual = [0, 0, 0, 0]
+```
+
+### `reversible_pack.rev`
+
+Shows compact feature packing for bit/token-style inputs. `pack_bits` converts
+an 8-wide bit tensor into a scalar payload, and `unpack_bits` records the
+decoded tensor as a witness. Backward execution clears the compact and decoded
+views while preserving the exact source flags.
+
+```sh
+cargo run -p reverie-cli -- run examples/reversible_pack.rev
+cargo run -p reverie-cli -- reverse examples/reversible_pack.rev \
+  --var packed=77 \
+  --var 'unpacked=[1,0,1,1,0,0,1,0]'
+```
+
+Expected outputs include:
+
+```text
+packed = 77
+unpacked = [1, 0, 1, 1, 0, 0, 1, 0]
+packed = 0
+unpacked = [0, 0, 0, 0, 0, 0, 0, 0]
+```
+
+### `reversible_inference_trace.rev`
+
+Combines reversible preprocessing with a tiny Q31 linear classifier. The raw
+sample is centered and permuted into `features`, `vecmat_q31` records class
+logits, while `top_k_indices`, `top_k_values`, `argmax`, `runner_up`,
+`top2_margin`, `rank_of`, `argmax_eq`, and `top_k_contains` record the
+deterministic ranked classes, ranked logits, prediction, runner-up class,
+confidence margin, true-label rank, top-1 label check, and top-k label check. The
+inverse clears `features`, `logits`, `top_classes`, `top_logit_values`,
+`prediction`, `runner_up_class`, `margin`, `label_rank`, `correct`, and
+`top2_correct` while preserving the raw sample and model.
+
+```sh
+cargo run -p reverie-cli -- run examples/reversible_inference_trace.rev
+cargo run -p reverie-cli -- reverse examples/reversible_inference_trace.rev \
+  --var 'features=[1073741824,-1073741824,1610612736,536870912]' \
+  --var 'logits=[1073741824,1610612736,536870912]' \
+  --var 'top_classes=[1,0,2]' \
+  --var 'top_logit_values=[1610612736,1073741824,536870912]' \
+  --var prediction=1 \
+  --var runner_up_class=0 \
+  --var margin=536870912 \
+  --var label_rank=1 \
+  --var correct=1 \
+  --var top2_correct=1
+```
+
+Expected outputs include:
+
+```text
+logits = [1073741824, 1610612736, 536870912]
+top_classes = [1, 0, 2]
+top_logit_values = [1610612736, 1073741824, 536870912]
+prediction = 1
+runner_up_class = 0
+margin = 536870912
+label_rank = 1
+correct = 1
+top2_correct = 1
+logits = [0, 0, 0]
+top_classes = [0, 0, 0]
+top_logit_values = [0, 0, 0]
+runner_up_class = 0
+margin = 0
+label_rank = 0
+top2_correct = 0
+features = [0, 0, 0, 0]
+```
+
+### `mnist_identify.rev`
+
+Checks a full MNIST-shaped reversible Q31 linear classifier inference step. It
+keeps `logits`, `prediction`, and `correct` in the final state as witnesses so
+the inverse can uncompute the identification exactly.
+
+```sh
+cargo run -p reverie-cli -- check examples/mnist_identify.rev
+```
+
+### `mnist_reversible_step.rev`
+
+Checks a full MNIST-shaped reversible Q31 linear classifier/training step. The
+program uses `image: tensor<int, 784>`, `weights: tensor<int, 784, 10>`,
+`bias: tensor<int, 10>`, `logits/error: witness<tensor<int, 10>>`,
+`vecmat_q31` for inference, `argmax` and `argmax_eq` for
+identification/accuracy, and `outer_q31` plus `scale_q31` for a reversible
+single-sample update. `logits` and `error` remain as witnesses so the inverse
+can restore mutated parameters before uncomputing the forward pass.
+
+```sh
+cargo run -p reverie-cli -- check examples/mnist_reversible_step.rev
+cargo run -p reverie-cli --bin reverie-mnist-linear -- --self-test
+```
+
+### `mnist_witness_tape.rev`
+
+Shows the same reversible MNIST-shaped training idea with the witness trace
+stored as first-class `witness<tensor<...>>` state. The example keeps two
+samples' `logits_tape`, `error_tape`, `prediction_tape`, and `correct_tape`
+entries inside the program state, so the inverse can restore the previous
+model from the final model plus those tensor witnesses.
+`reverie explain --json` reports the static witness proof cost for this state
+as `witness_metrics`, while `run --json` and `reverse --json` emit
+`witness_proof` fingerprints for the concrete witness values.
+
+```sh
+cargo run -p reverie-cli -- check examples/mnist_witness_tape.rev
+cargo run -p reverie-cli -- explain examples/mnist_witness_tape.rev --json
+```
+
+### `mnist_witness_tape_loop.rev`
+
+Shows the batched form of the same trace pattern. An `iterate int sample = 0 to
+len(labels) - 1` loop indexes `images`, `labels`, and each
+`witness<tensor<...>>` by `sample`, so the source follows the dataset tensor
+length instead of hand-writing one block per sample.
+For the two-sample demo, `explain --json` reports 44 shaped witness `int`
+cells, or 352 logical payload bytes.
+
+```sh
+cargo run -p reverie-cli -- check examples/mnist_witness_tape_loop.rev
+```
+
+### `mnist_mlp_witness.rev`
+
+Extends the auditable ML pattern from a linear classifier to a tiny MLP-shaped
+kernel. The program keeps hidden preactivations, Q31 ReLU masks, hidden
+activations, output errors, hidden backprop values, and hidden deltas in
+first-class witness tensor tapes before updating `w1/b1` and `w2/b2`. Its
+sample loop is also bounded by `len(labels) - 1`, which keeps the activation
+and gradient witnesses aligned with the dataset shape.
+
+```sh
+cargo run -p reverie-cli -- check examples/mnist_mlp_witness.rev
+```
+
+Use `--vars-json PATH` with `run`, `reverse`, or `scrub --dump` to override
+large tensor globals such as `images`, `w1`, `b1`, `w2`, and `b2` from exact
+integer JSON when experimenting with externally trained Q31 weights.
+`scripts/export_q31_mlp_vars.py` converts common PyTorch-style `fc1`/`fc2`
+state dictionaries or `.npz` members into that seed shape:
+
+```sh
+python3 scripts/export_q31_mlp_vars.py \
+  --input target/mlp-state-dict.json \
+  --output target/mlp-vars.json \
+  --input-scale float
+cargo run -p reverie-cli -- run examples/mnist_mlp_witness.rev \
+  --vars-json target/mlp-vars.json \
+  --json > target/mlp-run.json
+python3 scripts/check_q31_mlp_witness.py \
+  --vars-json target/mlp-vars.json \
+  --run-output-json target/mlp-run.json \
+  --json > target/mlp-check-report.json
+python3 scripts/summarize_mnist_ml_profile.py target/mlp-check-report.json \
+  --output target/mlp-check-report.md
+```
+
+The checker emits the `deterministic_q31_mlp_witness_replay` proof-cost shape
+in JSON mode, including witness bytes, trace bytes, replay bytes, recompute
+steps, recomputed update bytes, and the checked `witness_proof` fingerprint.
+The profile summary renderer turns that same report into a compact Markdown
+proof-cost table.
+
+With local IDX files, the host runner drives those Reverie programs over real
+MNIST data:
+
+```sh
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --train-images data/train-images-idx3-ubyte \
+  --train-labels data/train-labels-idx1-ubyte \
+  --test-images data/t10k-images-idx3-ubyte \
+  --test-labels data/t10k-labels-idx1-ubyte \
+  --epochs 1 \
+  --reverse-check
+```
+
+`--reverse-check` keeps a compact witness tape of sample indexes, logits,
+errors, predictions, and labels, reports the trace payload size, then runs the
+Reverie inverse over every training step to prove the final weights restore to
+the initial model.
+
+Add `--json` to emit the same run as a machine-readable audit artifact with
+train/eval throughput, witness-trace bytes, reverse-check cost, loaded dataset
+payload, model payload, estimated payload, peak RSS when the platform exposes
+it, and a `proof` section that makes the replay tradeoff explicit: model
+bytes, saved sample bytes, witness bytes, full replay payload bytes, per-step
+replay bytes, and forward/inverse recompute steps:
+
+```sh
+cargo run -p reverie-cli --bin reverie-mnist-linear -- --self-test --json
+```
+
+Use `--audit-output PATH` when you want a replayable proof bundle instead of
+only metrics. The bundle stores the final model plus per-step witnesses,
+including the image bytes used by each step, along with SHA-256 fingerprints of
+the source programs, final model, witness trace, report, unsigned payload, and
+stable computation identity. `--verify-audit PATH` recomputes those
+fingerprints, replays the saved trace forward to prove the witnesses and final
+model agree with fresh Reverie execution, then replays backward to prove the
+initial model is restored. The bundle also carries the proof-cost summary, and
+the verifier recomputes it, so the artifact records the storage/recompute
+shape of its own replay proof without trusting the stored numbers.
+`--export-model AUDIT --model-output PATH` replays that audit bundle forward
+and backward, then writes the final Q31 weights as a signed standalone model
+bundle with source/proof provenance and model payload bytes. `--verify-model
+PATH` later checks the model shape, model payload bytes, fingerprints, source
+audit provenance, and embedded training proof-cost summary without replaying
+the full training trace.
+`--import-model-json PATH --model-output PATH` wraps an externally trained
+Q31 linear model in the same signed model-bundle format. The source JSON can be
+either `{ "weights": ..., "bias": ... }` or `{ "model": { "weights": ...,
+"bias": ... } }`; the verifier records `provenance_kind: "external_import"`
+and, when the source file is available, checks its hash and model contents
+instead of claiming a Reverie training proof.
+`--scan-audit PATH --audit-limit N` summarizes
+correctness, witness mismatches, trace bytes, largest updates, and the
+lowest-margin training step. It emits per-label summaries, top confusion
+pairs, and separate ranked views for suspicious steps, low-margin close calls,
+and large updates so you can find the training steps worth inspecting.
+Optional scan gates such as `--audit-max-witness-mismatches 0`,
+`--audit-min-margin 0`, `--audit-min-accuracy 95`,
+`--audit-max-weight-delta N`, and `--audit-require-label-coverage` turn those
+metrics into a pass/fail replay policy for CI or repeatable experiments.
+`--inspect-audit PATH --audit-step N` reconstructs the selected step's
+before/after model window by reversing from the saved final model, then shows
+the witnesses, top logits, winner-vs-runner-up margin, and update deltas for
+that step. Its JSON report includes a `debug_contract` proving the witness,
+model window, observed deltas, and explanatory state line up for stepping
+backward from the model update. Add `--step-output PATH` to save that one
+update as a standalone replay bundle whose verifier reruns the step forward
+and backward without the full trace. Step bundles carry their own signed proof
+object for model bytes,
+sample bytes, witness bytes, derived update bytes, replay bytes, and
+forward/inverse recompute steps; `--verify-step` recomputes that proof before
+accepting the artifact. `--inspect-inference PATH
+--audit-step N` runs the saved final model against the selected sample through
+`mnist_identify.rev`; add `--inference-output PATH` to save that inference as a
+standalone replay bundle whose verifier reruns forward and backward inference
+without the training bundle. Inference reports include deterministic Q31
+attribution for the predicted class: winning digit, runner-up, margin, bias,
+reconstructed logit, reconstructed margin, the largest signed active-pixel
+contributions for the winning logit, and the largest signed active-pixel
+contributions for the winner-vs-runner-up margin. The standalone verifier
+recomputes those contributions from the saved model and sample. The inference
+bundle reports the memory/recompute tradeoff directly:
+model bytes, sample bytes, witness/result bytes, zero trace bytes, replay
+payload bytes, runtime state bytes, and the forward/inverse recompute count.
+It also carries a signed `proof` object for the deterministic Q31 inference
+claim; `--verify-inference` rebuilds that proof from the saved model, sample,
+result, and fresh Reverie forward/backward execution before accepting the
+artifact, and when referenced model, training-audit, sample, or evaluation
+artifacts are available it also checks the embedded inputs against those signed
+sources. Inference reports also carry an `explanation_contract` with the claim
+`q31_inference_prediction_explanation`; it ties the prediction to the logits,
+checks the label result, reconstructs the winning logit and margin from
+attribution rows, and records that reverse replay restores the initial
+model/sample state. Verification reports extend the same contract with proof,
+result, and source-input checks.
+`--inspect-model-inference MODEL --sample-audit AUDIT --audit-step N` runs the
+same deterministic inference from a signed model bundle while borrowing the
+image and label from an audited sample. Use `--sample-json PATH` instead when
+the input is a new labeled sample object with `image_u8` and `label`; the
+resulting inference bundle embeds the sample and records the sample JSON
+fingerprint. Add `--standalone-rev-output PATH` to any inspected inference
+path to emit a self-contained `.rev` classifier with the selected Q31 image,
+weights, bias, label, and expected prediction embedded as global tensor
+literals. That file can then be checked, run, or roundtripped with the normal
+`reverie` CLI, so the final classification step is plain Reverie source rather
+than a dedicated MNIST runner. `--export-samples AUDIT --samples-output PATH`
+exports audited
+images and labels into the same sample-set JSON shape accepted by
+`--evaluate-model`, and `--verify-samples PATH` checks the sample-set
+fingerprint, shape, and signed lineage proof. Exported samples retain
+`audit_step` and `source_sample_index`, and evaluation rows preserve that
+lineage with a per-sample fingerprint. When the referenced source audit file is
+available, `--verify-samples` also checks the exported pixels, labels, and
+source sample indexes against the named audit steps. `--evaluate-model MODEL --samples-json PATH` runs the
+signed model over a JSON array or `samples` object of labeled inputs, reports
+deterministic accuracy and lowest-margin rows, and records aggregate
+sample/witness proof bytes. `--scan-evaluation PATH` ranks incorrect and
+lowest-margin evaluation rows while keeping that sample lineage visible.
+`--inspect-evaluation PATH --evaluation-row N` expands one signed row into a
+full recomputed inference audit and can save it as a standalone replay bundle
+with `--inference-output PATH`; `--verify-inference` checks that replay bundle
+against the referenced evaluation row when the evaluation bundle is available.
+Evaluation gates such as `--eval-min-accuracy 99`,
+`--eval-min-margin 0`, `--eval-max-incorrect 0`, and
+`--eval-require-label-coverage` turn that report into a pass/fail deployment
+policy. Add `--evaluation-output PATH` to save the model, embedded samples,
+rows, proof-cost fields, gate policy, and gate result as a signed evaluation
+bundle; `--verify-evaluation PATH` reruns every sample and reapplies the stored
+gate. When the referenced model bundle and samples file are available, it also
+checks that the embedded model and samples match those signed source artifacts.
+`--compare-artifacts PATH...` verifies full training, standalone model,
+extracted step, inference, and model evaluation proof artifacts, then compares
+their actual file bytes against logical payload bytes and recompute counts. In
+JSON mode, the `ml_profile` block aggregates model/sample/witness/trace/update
+payload bytes, total forward/inverse recompute steps, total recompute steps,
+and trace-to-model plus witness-to-model payload ratios:
+
+```sh
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --self-test --audit-output target/mnist-self-test-replay-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --verify-audit target/mnist-self-test-replay-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --export-model target/mnist-self-test-replay-bundle.json \
+  --model-output target/mnist-self-test-model-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --import-model-json target/q31-linear-model.json \
+  --model-output target/imported-q31-linear-model-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --verify-model target/mnist-self-test-model-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --scan-audit target/mnist-self-test-replay-bundle.json --audit-limit 5
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --inspect-audit target/mnist-self-test-replay-bundle.json --audit-step 0
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --inspect-audit target/mnist-self-test-replay-bundle.json \
+  --audit-step 0 \
+  --step-output target/mnist-self-test-step-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --verify-step target/mnist-self-test-step-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --inspect-inference target/mnist-self-test-replay-bundle.json --audit-step 0
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --inspect-inference target/mnist-self-test-replay-bundle.json \
+  --audit-step 0 \
+  --inference-output target/mnist-self-test-inference-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --verify-inference target/mnist-self-test-inference-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --inspect-model-inference target/mnist-self-test-model-bundle.json \
+  --sample-audit target/mnist-self-test-replay-bundle.json \
+  --audit-step 0 \
+  --inference-output target/mnist-self-test-model-inference-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --inspect-model-inference target/mnist-self-test-model-bundle.json \
+  --sample-audit target/mnist-self-test-replay-bundle.json \
+  --audit-step 0 \
+  --standalone-rev-output target/mnist-standalone-classifier.rev
+cargo run -p reverie-cli -- run target/mnist-standalone-classifier.rev --json
+cargo run -p reverie-cli -- roundtrip target/mnist-standalone-classifier.rev --json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --inspect-model-inference target/mnist-self-test-model-bundle.json \
+  --sample-json target/mnist-sample.json \
+  --inference-output target/mnist-sample-inference-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --export-samples target/mnist-self-test-replay-bundle.json \
+  --samples-output target/mnist-samples.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --verify-samples target/mnist-samples.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --evaluate-model target/mnist-self-test-model-bundle.json \
+  --samples-json target/mnist-samples.json \
+  --eval-min-accuracy 99 \
+  --eval-min-margin 0 \
+  --eval-max-incorrect 0 \
+  --evaluation-output target/mnist-evaluation-bundle.json \
+  --json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --verify-evaluation target/mnist-evaluation-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --scan-evaluation target/mnist-evaluation-bundle.json \
+  --evaluation-limit 5
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --inspect-evaluation target/mnist-evaluation-bundle.json \
+  --evaluation-row 0 \
+  --inference-output target/mnist-evaluation-row-inference-bundle.json
+cargo run -p reverie-cli --bin reverie-mnist-linear -- \
+  --compare-artifacts \
+  target/mnist-self-test-replay-bundle.json \
+  target/mnist-self-test-model-bundle.json \
+  target/mnist-samples.json \
+  target/mnist-self-test-step-bundle.json \
+  target/mnist-self-test-inference-bundle.json \
+  target/mnist-evaluation-bundle.json
+```
+
 ### `perm_to_code.rev`
 
 Translates Jana's permutation-to-code example. The program converts a
@@ -643,17 +1160,17 @@ it moves prime factors into `fact[1..]`, clears `num`, and returns the
 temporaries to zero.
 
 ```sh
-cargo run -p reverie-cli -- run examples/janus_factor.rev --var num=84
+cargo run -p reverie-cli -- run examples/janus_factor.rev --var num=840
 cargo run -p reverie-cli -- reverse examples/janus_factor.rev \
   --var num=0 --var try=0 --var z=0 --var i=0 \
-  --var 'fact=[0,2,2,3,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]'
+  --var 'fact=[0,2,2,2,3,5,7,0,0,0,0,0,0,0,0,0,0,0,0,0]'
 ```
 
 Expected outputs:
 
 ```text
-{fact = [0, 2, 2, 3, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], i = 0, num = 0, try = 0, z = 0}
-{fact = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], i = 0, num = 84, try = 0, z = 0}
+{fact = [0, 2, 2, 2, 3, 5, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], i = 0, num = 0, try = 0, z = 0}
+{fact = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], i = 0, num = 840, try = 0, z = 0}
 ```
 
 ### `units.rev`

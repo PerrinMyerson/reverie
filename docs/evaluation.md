@@ -93,6 +93,16 @@ examples/size.rev
 examples/stack.rev
 examples/janus_stack_reverse.rev
 examples/janus_sort.rev
+examples/tensor_linear.rev
+examples/invertible_coupling.rev
+examples/triangular_residual.rev
+examples/reversible_preprocess.rev
+examples/reversible_inference_trace.rev
+examples/mnist_identify.rev
+examples/mnist_reversible_step.rev
+examples/mnist_witness_tape.rev
+examples/mnist_witness_tape_loop.rev
+examples/mnist_mlp_witness.rev
 examples/bit_reversal.rev
 examples/perm_to_code.rev
 examples/janus_automata.rev
@@ -121,13 +131,17 @@ as `assert_eq`, `assert_ne`, `len(xs)`, `is_empty(s)`, `peek(s)`,
 
 Future expressiveness targets should include a broader language-feature audit
 and more side-by-side Janus translations. The checked example corpus now
-includes statically proven distinct element arguments, prefix/postfix update sugar,
-bit-reversal permutation, permutation-to-factorial-code conversion, run-length
-encoding with an explicit witness array, a historic Janus-style cellular
-automata translation, and a strict reversible Turing-machine translation; the
-external benchmark corpus includes compact Janus-style
-Schrodinger, Turing-machine, and multidimensional matrix-transpose fixtures in
-forward, reverse, and round-trip directions.
+includes statically proven distinct element arguments, prefix/postfix update
+sugar, tensor accumulation, reversible and witness-taped MNIST-shaped kernels,
+a small MLP witness pattern, invertible additive coupling and triangular
+residual layers, a reversible Q31 preprocessing block, a deterministic
+reversible inference trace, bit-reversal
+permutation, permutation-to-factorial-code conversion, run-length encoding with
+an explicit witness array, a historic Janus-style cellular automata
+translation, and a strict reversible Turing-machine translation; the external
+benchmark corpus includes compact Janus-style Schrodinger, Turing-machine, and
+multidimensional matrix-transpose fixtures in forward, reverse, and round-trip
+directions.
 
 ## Demo Evaluation
 
@@ -164,10 +178,11 @@ the internal Criterion benchmark target without running the benchmark suite,
 checks that Criterion groups still include their expected measurements, checks
 that benchmark wrappers are registered with Criterion,
 that the machine-readable `explain --json` schema stays parseable, including
-the `safety_checks` and `safety_check_counts` fields over an indexed-array
-fixture. The schema checker also has a build-independent `--self-test` mode
-for its own negative fixtures, including missing, extra, non-integer, and
-non-positive safety-check counts, and CI runs
+the `dataset_loops`, `safety_checks`, and `safety_check_counts` fields over
+indexed-array and dataset-loop fixtures. The schema checker also has a
+build-independent `--self-test` mode for its own negative fixtures, including
+missing, extra, non-integer, and non-positive safety-check counts plus malformed
+dataset-loop metadata, and CI runs
 `scripts/check_ci_workflow.py` so these CI gates cannot silently disappear.
 The Jana
 compatibility inventory can also be validated with

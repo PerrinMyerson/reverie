@@ -51,6 +51,10 @@ def ms(seconds: float) -> str:
     return f"{seconds * 1000:.3f} ms"
 
 
+def mib(bytes_value: float) -> str:
+    return f"{bytes_value / (1024 * 1024):.2f} MiB"
+
+
 def number(value: Any) -> bool:
     return (
         not isinstance(value, bool)
@@ -107,6 +111,16 @@ def render_markdown(
         min_geomean_speedup = gate_value(data, "min_geomean_speedup")
     benchmarks = data["benchmarks"]
     speedups = [bench["speedup"] for bench in benchmarks]
+    memory_ratios = [
+        bench["memory_ratio"]
+        for bench in benchmarks
+        if number(bench.get("memory_ratio"))
+    ]
+    has_memory = any(
+        number(bench.get(side, {}).get("median_max_rss_bytes"))
+        for bench in benchmarks
+        for side in ("jana", "reverie")
+    )
     observed_min = min(speedups)
     observed_median = statistics.median(speedups)
     observed_geomean = statistics.geometric_mean(speedups)
@@ -137,6 +151,12 @@ def render_markdown(
     range_line = f"Speedup range: `{observed_min:.2f}x` to `{max(speedups):.2f}x`"
     if min_observed_speedup is not None:
         range_line += f" (minimum required `{min_observed_speedup:.2f}x`)"
+    memory_line = None
+    if memory_ratios:
+        memory_line = (
+            "Median peak RSS ratio (Jana/Reverie): "
+            f"`{statistics.median(memory_ratios):.2f}x`"
+        )
 
     lines = [
         "# Jana vs Reverie Benchmark Summary",
@@ -157,6 +177,8 @@ def render_markdown(
         f"Strongest workload: `{strongest['name']}` at `{strongest['speedup']:.2f}x`",
         f"Gate: `{'PASS' if not failed and not aggregate_failed else 'FAIL'}`",
     ]
+    if memory_line is not None:
+        lines.insert(8, memory_line)
     if failed:
         lines.append(f"Failing workloads: `{', '.join(failed)}`")
     if min_observed_speedup is not None and observed_min < min_observed_speedup:
@@ -174,24 +196,64 @@ def render_markdown(
             "Geometric mean speedup failure: "
             f"`{observed_geomean:.2f}x` is below `{min_geomean_speedup:.2f}x`"
         )
-    lines.extend(
-        [
-            "",
-            "| workload | Jana median | Reverie median | speedup |",
-            "| --- | ---: | ---: | ---: |",
-        ]
-    )
-    for bench in benchmarks:
-        lines.append(
-            "| `{name}` | {jana} | {reverie} | {speedup:.2f}x |".format(
-                name=bench["name"],
-                jana=ms(bench["jana"]["median_seconds"]),
-                reverie=ms(bench["reverie"]["median_seconds"]),
-                speedup=bench["speedup"],
-            )
+    if has_memory:
+        lines.extend(
+            [
+                "",
+                (
+                    "| workload | Jana median | Jana peak RSS | Reverie median | "
+                    "Reverie peak RSS | speedup | RSS ratio |"
+                ),
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
         )
+    else:
+        lines.extend(
+            [
+                "",
+                "| workload | Jana median | Reverie median | speedup |",
+                "| --- | ---: | ---: | ---: |",
+            ]
+        )
+    for bench in benchmarks:
+        if has_memory:
+            memory_ratio = bench.get("memory_ratio")
+            lines.append(
+                (
+                    "| `{name}` | {jana_time} | {jana_rss} | "
+                    "{reverie_time} | {reverie_rss} | {speedup:.2f}x | "
+                    "{memory_ratio} |"
+                ).format(
+                    name=bench["name"],
+                    jana_time=ms(bench["jana"]["median_seconds"]),
+                    jana_rss=format_optional_mib(
+                        bench["jana"].get("median_max_rss_bytes")
+                    ),
+                    reverie_time=ms(bench["reverie"]["median_seconds"]),
+                    reverie_rss=format_optional_mib(
+                        bench["reverie"].get("median_max_rss_bytes")
+                    ),
+                    speedup=bench["speedup"],
+                    memory_ratio=(
+                        f"{memory_ratio:.2f}x" if number(memory_ratio) else "-"
+                    ),
+                )
+            )
+        else:
+            lines.append(
+                "| `{name}` | {jana} | {reverie} | {speedup:.2f}x |".format(
+                    name=bench["name"],
+                    jana=ms(bench["jana"]["median_seconds"]),
+                    reverie=ms(bench["reverie"]["median_seconds"]),
+                    speedup=bench["speedup"],
+                )
+            )
     lines.append("")
     return "\n".join(lines)
+
+
+def format_optional_mib(value: Any) -> str:
+    return mib(float(value)) if number(value) else "-"
 
 
 def synthetic_benchmark(
@@ -204,9 +266,16 @@ def synthetic_benchmark(
     return {
         "name": name,
         "direction": direction or workload_direction(name),
-        "jana": {"median_seconds": 0.010 * speedup},
-        "reverie": {"median_seconds": 0.010},
+        "jana": {
+            "median_seconds": 0.010 * speedup,
+            "median_max_rss_bytes": 40 * 1024 * 1024,
+        },
+        "reverie": {
+            "median_seconds": 0.010,
+            "median_max_rss_bytes": 20 * 1024 * 1024,
+        },
         "speedup": speedup,
+        "memory_ratio": 2.0,
         "passes_min_speedup": passes_min_speedup,
     }
 
@@ -264,9 +333,15 @@ def run_self_tests() -> int:
         "Geometric mean speedup: `4.00x` (required `2.00x`)",
     )
     expect_contains(
+        "memory summary",
+        passing,
+        "Median peak RSS ratio (Jana/Reverie): `2.00x`",
+    )
+    expect_contains("memory table", passing, "| workload | Jana median | Jana peak RSS |")
+    expect_contains(
         "table row",
         passing,
-        "| `loop_reverse` | 40.000 ms | 10.000 ms | 4.00x |",
+        "| `loop_reverse` | 40.000 ms | 40.00 MiB | 10.000 ms | 20.00 MiB | 4.00x | 2.00x |",
     )
 
     fallback_direction_artifact = synthetic_summary_artifact()

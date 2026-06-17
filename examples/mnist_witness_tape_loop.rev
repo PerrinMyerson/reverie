@@ -1,0 +1,30 @@
+// MNIST-shaped batched training trace with first-class witness tapes.
+//
+// This is the looped form of `mnist_witness_tape.rev`: each iteration writes
+// one sample's witnesses into indexed tensor slots, then updates the model.
+// The loop bound comes from the label tensor length, so the trace follows the
+// dataset shape. The inverse walks the loop backward and consumes those same
+// slots to restore the previous weights and bias exactly.
+
+global images: tensor<int, 2, 784>;
+global labels: tensor<int, 2> = [0, 1];
+global weights: tensor<int, 784, 10>;
+global bias: tensor<int, 10>;
+global logits_tape: witness<tensor<int, 2, 10>>;
+global error_tape: witness<tensor<int, 2, 10>>;
+global prediction_tape: witness<tensor<int, 2>>;
+global correct_tape: witness<tensor<int, 2>>;
+global lr = 2147483;
+
+procedure main() {
+  iterate int sample = 0 to len(labels) - 1
+    logits_tape[sample] += vecmat_q31(images[sample], weights);
+    logits_tape[sample] += bias;
+    prediction_tape[sample] += argmax(logits_tape[sample]);
+    correct_tape[sample] += argmax_eq(logits_tape[sample], labels[sample]);
+    error_tape[sample] += logits_tape[sample];
+    error_tape[sample] -= one_hot_q31(labels[sample], 10);
+    weights -= scale_q31(outer_q31(images[sample], error_tape[sample]), lr);
+    bias -= scale_q31(error_tape[sample], lr)
+  end
+}

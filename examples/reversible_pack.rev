@@ -1,0 +1,15 @@
+// Reversible bit-packing recipe for compact deterministic ML features.
+//
+// The raw flag tensor stays intact, `packed` accumulates the compact scalar
+// view, and `unpacked` records the decoded bits as a witness. Backward
+// execution clears the compact and witness views while preserving the exact
+// source flags.
+
+global flags: tensor<int, 8> = [1, 0, 1, 1, 0, 0, 1, 0];
+global packed;
+global unpacked: witness<tensor<int, 8>>;
+
+procedure main() {
+  packed += pack_bits(flags);
+  unpacked += unpack_bits(packed, 8)
+}

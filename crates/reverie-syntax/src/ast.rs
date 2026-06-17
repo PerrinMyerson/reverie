@@ -84,9 +84,20 @@ pub struct Param {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypeExpr {
-    Int { unit: Option<SpannedUnit> },
+    Int {
+        unit: Option<SpannedUnit>,
+    },
     Bool,
-    Array { element: Box<SpannedType> },
+    Array {
+        element: Box<SpannedType>,
+    },
+    Tensor {
+        element: Box<SpannedType>,
+        shape: Vec<usize>,
+    },
+    Witness {
+        inner: Box<SpannedType>,
+    },
     Stack,
 }
 
@@ -244,6 +255,10 @@ pub enum Expr {
         op: BinaryOp,
         left: Box<SpannedExpr>,
         right: Box<SpannedExpr>,
+    },
+    Call {
+        name: String,
+        args: Vec<SpannedExpr>,
     },
 }
 

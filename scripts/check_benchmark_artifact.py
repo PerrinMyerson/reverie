@@ -240,14 +240,19 @@ def integer(value: Any) -> bool:
 
 def synthetic_side(binary: str, median_seconds: float) -> dict[str, Any]:
     samples = [median_seconds, median_seconds]
+    rss_samples = [20 * 1024 * 1024, 22 * 1024 * 1024]
     command = [binary, "/tmp/reverie-benchmark-fixture.rev"]
     return {
         "command": command,
         "commands": [command],
         "expected_stdout": [["ok"]],
+        "max_rss_bytes": max(rss_samples),
         "mean_seconds": statistics.mean(samples),
+        "mean_max_rss_bytes": statistics.mean(rss_samples),
         "median_seconds": statistics.median(samples),
+        "median_max_rss_bytes": statistics.median(rss_samples),
         "min_seconds": min(samples),
+        "samples_max_rss_bytes": rss_samples,
         "samples_seconds": samples,
     }
 
@@ -285,6 +290,7 @@ def valid_synthetic_artifact() -> dict[str, Any]:
                 "passes_min_speedup": True,
                 "reverie": reverie,
                 "speedup": 2.0,
+                "memory_ratio": 1.0,
             }
         ],
         "command_timeout_seconds": 1.0,
@@ -610,9 +616,13 @@ def validate_sample_summary(
             "command",
             "commands",
             "expected_stdout",
+            "max_rss_bytes",
             "mean_seconds",
+            "mean_max_rss_bytes",
             "median_seconds",
+            "median_max_rss_bytes",
             "min_seconds",
+            "samples_max_rss_bytes",
             "samples_seconds",
             "source_files",
         },
@@ -652,6 +662,57 @@ def validate_sample_summary(
         f"{benchmark_name}.{side_name}: min_seconds does not match samples",
         errors,
     )
+    rss_samples = side.get("samples_max_rss_bytes")
+    if rss_samples is not None:
+        if not isinstance(rss_samples, list):
+            errors.append(
+                f"{benchmark_name}.{side_name}: samples_max_rss_bytes must be a list"
+            )
+            return
+        require(
+            len(rss_samples) == runs,
+            (
+                f"{benchmark_name}.{side_name}: expected {runs} RSS sample(s), "
+                f"found {len(rss_samples)}"
+            ),
+            errors,
+        )
+        bad_rss_samples = [
+            sample
+            for sample in rss_samples
+            if not number(sample) or sample < 0
+        ]
+        require(
+            not bad_rss_samples,
+            (
+                f"{benchmark_name}.{side_name}: RSS samples must be "
+                "non-negative finite numbers"
+            ),
+            errors,
+        )
+        if bad_rss_samples:
+            return
+        require(
+            side.get("median_max_rss_bytes") == statistics.median(rss_samples),
+            (
+                f"{benchmark_name}.{side_name}: median_max_rss_bytes "
+                "does not match RSS samples"
+            ),
+            errors,
+        )
+        require(
+            side.get("mean_max_rss_bytes") == statistics.mean(rss_samples),
+            (
+                f"{benchmark_name}.{side_name}: mean_max_rss_bytes "
+                "does not match RSS samples"
+            ),
+            errors,
+        )
+        require(
+            side.get("max_rss_bytes") == max(rss_samples),
+            f"{benchmark_name}.{side_name}: max_rss_bytes does not match RSS samples",
+            errors,
+        )
     commands = side.get("commands")
     if not isinstance(commands, list) or len(commands) < 1:
         errors.append(f"{benchmark_name}.{side_name}: commands must be a non-empty list")
@@ -1251,6 +1312,7 @@ def validate_artifact(
                 "passes_min_speedup",
                 "reverie",
                 "speedup",
+                "memory_ratio",
             },
             errors,
         )
@@ -1316,6 +1378,23 @@ def validate_artifact(
             )
         else:
             errors.append(f"{name}: medians must be positive finite numbers")
+        jana_rss_median = jana.get("median_max_rss_bytes")
+        reverie_rss_median = reverie.get("median_max_rss_bytes")
+        memory_ratio = benchmark.get("memory_ratio")
+        if (
+            number(jana_rss_median)
+            and number(reverie_rss_median)
+            and reverie_rss_median > 0
+        ):
+            require(
+                memory_ratio == jana_rss_median / reverie_rss_median,
+                f"{name}: memory_ratio does not match Jana/Reverie median RSS",
+                errors,
+            )
+        elif memory_ratio is not None:
+            errors.append(
+                f"{name}: memory_ratio must be null unless median RSS is recorded"
+            )
         if min_speedup is not None and number(speedup):
             require(
                 isinstance(benchmark.get("passes_min_speedup"), bool),

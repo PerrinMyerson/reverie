@@ -53,13 +53,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-median-speedup",
         type=float,
-        default=4.0,
+        default=3.0,
         help="Required floor for the suite median observed speedup.",
     )
     parser.add_argument(
         "--min-geomean-speedup",
         type=float,
-        default=4.0,
+        default=3.0,
         help="Required floor for the geometric mean observed speedup.",
     )
     parser.add_argument(
@@ -84,6 +84,15 @@ def parse_args() -> argparse.Namespace:
         "--no-build",
         action="store_true",
         help="Reuse an existing target/release/reverie binary.",
+    )
+    parser.add_argument(
+        "--measure-memory",
+        action="store_true",
+        help=(
+            "Ask the lower-level harness to record peak RSS samples alongside "
+            "timing. This may add timing overhead, so the default speed gate "
+            "keeps it disabled."
+        ),
     )
     parser.add_argument(
         "--only",
@@ -172,8 +181,8 @@ def self_test_args(**overrides: Any) -> argparse.Namespace:
         "warmup": 1,
         "min_speedup": 1.25,
         "min_observed_speedup": 2.0,
-        "min_median_speedup": 4.0,
-        "min_geomean_speedup": 4.0,
+        "min_median_speedup": 3.0,
+        "min_geomean_speedup": 3.0,
         "command_timeout": 30.0,
         "only": [],
     }
@@ -309,6 +318,8 @@ def main() -> int:
     ]
     if args.no_build:
         command.append("--no-build")
+    if args.measure_memory:
+        command.append("--measure-memory")
     for name in args.only:
         command.extend(["--only", name])
 

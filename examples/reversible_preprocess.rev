@@ -1,0 +1,16 @@
+// Reversible Q31 preprocessing pipeline for deterministic ML inputs.
+//
+// The raw sample stays intact while `features` accumulates a centered and
+// permuted view. Running backward clears `features` exactly without a witness
+// tape because every step is an additive update from disjoint state or a swap.
+
+global raw: tensor<int, 4> = [2147483648, 0, 1073741824, -536870912];
+global mean: tensor<int, 4> = [536870912, -536870912, 0, 536870912];
+global features: tensor<int, 4>;
+
+procedure main() {
+  features += raw;
+  features -= mean;
+  features[0] <=> features[2];
+  features[1] <=> features[3]
+}

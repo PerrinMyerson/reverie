@@ -1,0 +1,49 @@
+// End-to-end reversible Q31 inference trace.
+//
+// The raw input is centered and permuted into `features`, then a tiny
+// fixed-point linear classifier records logits, top classes, top logit values,
+// prediction, runner-up class, confidence margin, label rank, top-1
+// correctness, and top-2 correctness. Running backward from the final trace
+// clears `features`, `logits`, `top_classes`, `top_logit_values`,
+// `prediction`, `runner_up_class`, `margin`, `label_rank`, `correct`, and
+// `top2_correct` exactly while preserving raw input and model state.
+
+global raw: tensor<int, 4> = [2147483648, 0, 1073741824, -536870912];
+global mean: tensor<int, 4> = [536870912, -536870912, 0, 536870912];
+global features: tensor<int, 4>;
+
+global weights: tensor<int, 4, 3> = [
+  [2147483648, 0, 0],
+  [0, 0, 0],
+  [0, 2147483648, 0],
+  [0, 0, 2147483648]
+];
+global bias: tensor<int, 3> = [0, 0, 0];
+global logits: witness<tensor<int, 3>>;
+global top_classes: witness<tensor<int, 3>>;
+global top_logit_values: witness<tensor<int, 3>>;
+global prediction;
+global runner_up_class;
+global margin;
+global label_rank;
+global correct;
+global top2_correct;
+global label = 1;
+
+procedure main() {
+  features += raw;
+  features -= mean;
+  features[0] <=> features[2];
+  features[1] <=> features[3];
+
+  logits += vecmat_q31(features, weights);
+  logits += bias;
+  top_classes += top_k_indices(logits, 3);
+  top_logit_values += top_k_values(logits, 3);
+  prediction += argmax(logits);
+  runner_up_class += runner_up(logits);
+  margin += top2_margin(logits);
+  label_rank += rank_of(logits, label);
+  correct += argmax_eq(logits, label);
+  top2_correct += top_k_contains(logits, label, 2)
+}

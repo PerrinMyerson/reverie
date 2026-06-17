@@ -119,7 +119,10 @@ by-reference procedure parameters and local values whose initializer supplies
 the shape.
 Array type annotations such as `array<int>` are accepted for parameters and
 locals, but globals and source declarations must still spell concrete storage
-dimensions with suffixes such as `[3]`.
+dimensions with suffixes such as `[3]`. Tensor annotations such as
+`tensor<int, 2, 3>` carry their concrete shape in the type itself, so they are
+accepted for parameters, locals, globals, declarations, and CLI `--type`
+annotations without trailing array suffixes.
 
 Reversible conditionals:
 
@@ -196,6 +199,8 @@ array-suffix    ::= "[" "]"
 type            ::= "int" unit-suffix?
                   | "bool"
                   | "array" "<" type ">"
+                  | "tensor" "<" type "," int-literal ("," int-literal)* ">"
+                  | "witness" "<" type ">"
                   | "stack"
 ```
 
@@ -216,11 +221,21 @@ flag: bool
 xs: array<int>
 flags: array<bool>
 distances: array<int<m>>
+weights: tensor<int, 3, 2>
+logits_tape: witness<tensor<int, 2, 10>>
 s: stack
 n: int where n >= 0
 int fact[]
 stack s
 ```
+
+Tensor v1 supports dimensionless `int` elements only. Shapes must be positive
+integer dimensions. Forms that combine tensor type dimensions with trailing
+array suffixes, such as `tensor<int, 2, 3> x[4]`, are rejected because the
+storage shape would be ambiguous.
+`witness<T>` marks ordinary storage as replay/audit evidence while preserving
+the runtime representation and type behavior of `T`. Nested witness wrappers
+are rejected.
 
 ## Units
 
@@ -256,6 +271,7 @@ atom          ::= int-literal unit-suffix?
                 | ("empty" | "is_empty") "(" ident ")"
                 | ("top" | "peek") "(" ident ")"
                 | ("size" | "len") "(" ident ")"
+                | ident "(" expr-list? ")"
                 | ident ("[" expr "]")*
                 | "[" expr-list? "]"
                 | "{" expr-list? "}"
@@ -280,10 +296,32 @@ unary operators bind tightest. From tightest to loosest precedence:
 ||
 ```
 
-`--legacy-janus` keeps this precedence table while enabling older Janus surface
-rules such as case-insensitive identifiers and semicolon comments. Upstream
-Janus and Jana examples rely on comparisons binding looser than arithmetic and
-logical `&&`.
+`--legacy-janus` keeps this precedence table while enabling older Janus
+compatibility rules such as case-insensitive identifiers, semicolon comments,
+and permissive update aliases. Upstream Janus and Jana examples rely on
+comparisons binding looser than arithmetic and logical `&&`.
+
+The expression-call surface is reserved for built-in pure tensor operations in
+v1. Supported calls are `matmul`, `matmul_q31`, `matvec`, `matvec_q31`,
+`vecmat`, `vecmat_q31`, `dot`, `dot_q31`, `hadamard`, `hadamard_q31`, `outer`,
+`outer_q31`, `scale`, `scale_q31`, `clamp`, `clamp_q31`, `normalize_q31`,
+`pack_bits`, `unpack_bits`, `transpose`, `sum`, `relu`, `relu_mask_q31`,
+`argmax`, `runner_up`, `top2_margin`, `rank_of`, `top_k_indices`, `top_k_values`,
+`top_k_contains`, `argmax_eq`, `one_hot`, and `one_hot_q31`.
+Tensor-valued results can be used
+with reversible whole-tensor `+=` and `-=` updates when the target and
+right-hand side have the same statically known shape. `dot`, `dot_q31`, `sum`,
+`argmax`, `runner_up`, `top2_margin`, `top_k_contains`, `argmax_eq`,
+`rank_of`, and `pack_bits` return scalar `int` values. `top_k_indices(x, K)` and
+`top_k_values(x, K)` require a constant positive `K` no larger than the static
+tensor cell count and return rank-1 `tensor<int, K>` values. `top_k_contains(x,
+label, K)` uses the same descending-value ordering and returns `1` when `label`
+is in the top `K`, or `0` otherwise. `rank_of(x, label)` returns the 1-based
+rank of `label` under that same ordering, or `0` when the label is outside the
+tensor entries.
+`unpack_bits` requires a constant positive width of at most 63 and returns a
+rank-1 bit tensor. Q31 calls use the same signed fixed-point multiply
+semantics as the `*/` operator.
 
 ## Reversibility Restrictions
 
@@ -296,9 +334,10 @@ static restrictions include:
 - `x += e` and `x -= e` require integer operands with compatible units.
   `x ^= e` requires matching boolean operands or dimensionless integer
   operands.
-- `xs[i] += e` requires `i` not to mention `xs`. The right-hand side may read
-  other cells of `xs` only when constant indexes prove the read and write cells
-  are distinct.
+- `xs[i] += e` requires `i` not to mention `xs`. In strict mode, the
+  right-hand side may read other cells of `xs` only when constant indexes prove
+  the read and write cells are distinct. `--legacy-janus` permits
+  self-dependent update aliases for Jana compatibility.
 - Swap index expressions may not mention either mutated root.
 - `push(x, s)` and `pop(x, s)` require `x` to be an int place and `s` to be a
   stack; `pop` also requires the target place to hold zero at runtime.

@@ -1,0 +1,29 @@
+// MNIST-shaped reversible identify/train step.
+//
+// This is a single-sample, fixed-point linear classifier step over a full
+// 28x28 image flattened to 784 Q31 pixels and 10 Q31 logits.
+//
+// Reversibility note: `logits` and `error` are explicit witnesses. They are
+// intentionally retained after the weight update so the inverse can restore
+// weights and bias before uncomputing the forward pass.
+
+global image: tensor<int, 784>;
+global weights: tensor<int, 784, 10>;
+global bias: tensor<int, 10>;
+global logits: witness<tensor<int, 10>>;
+global error: witness<tensor<int, 10>>;
+global prediction;
+global correct;
+global label = 0;
+global lr = 107374182;
+
+procedure main() {
+  logits += vecmat_q31(image, weights);
+  logits += bias;
+  prediction += argmax(logits);
+  correct += argmax_eq(logits, label);
+  error += logits;
+  error -= one_hot_q31(label, 10);
+  weights -= scale_q31(outer_q31(image, error), lr);
+  bias -= scale_q31(error, lr)
+}

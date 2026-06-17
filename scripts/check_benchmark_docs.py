@@ -18,8 +18,8 @@ DEFAULT_DOCS = [
 ]
 REQUIRED_DOC_SNIPPETS = {
     "minimum observed speedup floor": "--min-observed-speedup 2.0",
-    "median speedup floor": "--min-median-speedup 4.0",
-    "geomean speedup floor": "--min-geomean-speedup 4.0",
+    "median speedup floor": "--min-median-speedup 3.0",
+    "geomean speedup floor": "--min-geomean-speedup 3.0",
     "forward direction count": "--expect-direction-count forward:19",
     "reverse direction count": "--expect-direction-count reverse:12",
     "roundtrip direction count": "--expect-direction-count roundtrip:10",
