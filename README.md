@@ -73,10 +73,8 @@ the image and model.
 The training demo uses `examples/mnist_reversible_step.rev`: forward execution
 writes the `logits` and `error` witness tape, then mutates `weights` and
 `bias`; reverse execution uses those witnesses to undo the model update and
-clear the tape. This is the stronger MNIST claim: training is reversible when
-the trace keeps the witnesses needed to explain and undo the update. Without
-that witness tape, final weights alone are not enough to reconstruct the
-training cause.
+clear the tape. Without that witness tape, final weights alone are not enough
+to reconstruct the training cause.
 
 ## Quick Start
 
