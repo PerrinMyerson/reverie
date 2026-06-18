@@ -14,14 +14,18 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-The README demo GIF is generated separately because it depends on macOS
-rendering tools:
+The README demo GIFs are generated separately because they depend on macOS
+`sips` and ImageMagick:
 
 ```sh
 python3 scripts/render_scrubber_gif.py
+python3 scripts/render_mnist_reversal_gif.py
+python3 scripts/render_mnist_training_reversal_gif.py
 ```
 
-The generated artifact is `docs/assets/reverie-scrub-demo.gif`.
+The generated artifacts are `docs/assets/reverie-scrub-demo.gif` and
+`docs/assets/reverie-mnist-reversal-demo.gif` plus
+`docs/assets/reverie-mnist-training-reversal-demo.gif`.
 
 ## Phase Checklist
 
@@ -54,7 +58,9 @@ The generated artifact is `docs/assets/reverie-scrub-demo.gif`.
 | 6 | Interactive scrubber TUI | `reverie scrub`, `reverie-tui` |
 | 6 | Step/rewind/jump/watch UI | `docs/scrubber.md`, TUI implementation |
 | 6 | Non-interactive demo and tests | `scrub --dump`, CLI/TUI tests |
-| 6 | README GIF | `docs/assets/reverie-scrub-demo.gif` |
+| 6 | README scrubber GIF | `docs/assets/reverie-scrub-demo.gif` |
+| 6 | README MNIST classification GIF | `docs/assets/reverie-mnist-reversal-demo.gif` |
+| 6 | README MNIST training GIF | `docs/assets/reverie-mnist-training-reversal-demo.gif` |
 | docs | Full language syntax reference | `docs/grammar.md` |
 | docs | CLI usage reference | `docs/cli.md` |
 | docs | Evaluation methodology | `docs/evaluation.md` |

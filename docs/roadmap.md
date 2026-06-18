@@ -89,7 +89,7 @@ Done:
 - variable watch timelines
 - deterministic timeline dump for tests and non-TTY demos
 - source-line highlighting for procedure-local execution contexts
-- README GIF generated from the real scrubber timeline
+- README GIFs generated from real scrubber and MNIST/Q31 reversal runs
 
 ## V1 Fill-Out: Arrays
 

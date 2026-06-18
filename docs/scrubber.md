@@ -95,5 +95,5 @@ python3 scripts/render_scrubber_gif.py
 
 The script runs `reverie scrub examples/fib.rev --dump`, renders a compact SVG
 frame for each timeline state, and stitches the frames into
-`docs/assets/reverie-scrub-demo.gif`. It uses macOS `qlmanage` and `sips` for
-SVG rendering/cropping and `ffmpeg` for GIF assembly.
+`docs/assets/reverie-scrub-demo.gif`. It uses macOS `sips` for SVG
+rasterization and ImageMagick `magick` for GIF assembly.

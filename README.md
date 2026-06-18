@@ -16,6 +16,11 @@ through a state timeline.
 
 ![Reverie scrubber demo](docs/assets/reverie-scrub-demo.gif)
 
+The scrubber demo shows ordinary Reverie execution first moving forward from
+the initial Fibonacci store to the final store, then moving backward through
+the same deterministic state timeline until the initial store is restored.
+The teal phase is forward execution; the pink phase is reverse restoration.
+
 ## Why It Matters
 
 Most execution tools tell you what happened after the fact. Reverie makes
@@ -31,6 +36,47 @@ small model or inference result should come with replayable evidence. The
 generic `roundtrip` proof path and the MNIST/Q31 audit helper both turn
 execution into signed, re-verifiable artifacts instead of loose screenshots or
 untrusted metrics.
+
+## MNIST Reversibility Unlock
+
+MNIST is Reverie's concrete ML audit path. A normal digit classifier can tell
+you the predicted label, accuracy, or loss after the fact; Reverie's Q31 linear
+and MLP examples keep the forward-pass intermediates, model updates, sample
+lineage, and inference traces in reversible witness state so the same run can
+be inspected in both directions.
+
+The unlock is that MNIST training, model export, inference, and sample-set
+evaluation become replayable evidence instead of detached reports. If a digit
+prediction, update, or low-margin row looks suspicious, the audit tools can
+reconstruct the model window, replay the exact Q31 arithmetic, verify the
+signed artifact, and reverse back to the prior state. Reversibility turns the
+ML result from "trust this metric" into "check the computation that produced
+it."
+
+The MNIST demos are about reversible ML state transitions, not reversing a
+prediction into an image or claiming novel digit-recognition accuracy. The
+visible digit is a small Q31 seed used to make the state changes readable.
+
+**Classification / Inference**
+
+![Reverie MNIST classification reversal demo](docs/assets/reverie-mnist-reversal-demo.gif)
+
+The classification demo uses `examples/mnist_identify.rev` with a visible
+28x28 digit seed: forward inference computes logits, prediction, and
+correctness; reverse execution clears those computed outputs while preserving
+the image and model.
+
+**Training / Witness Tape**
+
+![Reverie MNIST training reversal demo](docs/assets/reverie-mnist-training-reversal-demo.gif)
+
+The training demo uses `examples/mnist_reversible_step.rev`: forward execution
+writes the `logits` and `error` witness tape, then mutates `weights` and
+`bias`; reverse execution uses those witnesses to undo the model update and
+clear the tape. This is the stronger MNIST claim: training is reversible when
+the trace keeps the witnesses needed to explain and undo the update. Without
+that witness tape, final weights alone are not enough to reconstruct the
+training cause.
 
 ## Quick Start
 
@@ -279,10 +325,12 @@ The array example runs as:
 `scrub` opens the interactive timeline UI. Add `--dump` to print the same
 timeline without entering the TUI.
 
-The README GIF is generated from the real Fibonacci scrubber timeline:
+The README GIFs are generated from real Reverie runs:
 
 ```sh
 python3 scripts/render_scrubber_gif.py
+python3 scripts/render_mnist_reversal_gif.py
+python3 scripts/render_mnist_training_reversal_gif.py
 ```
 
 The checked Janus performance smoke gate is:

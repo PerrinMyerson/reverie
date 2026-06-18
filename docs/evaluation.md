@@ -147,9 +147,11 @@ directions.
 
 The scrubber is qualitative evidence. It should make reversibility visible:
 the user can move through the same deterministic timeline in both directions
-and see values flow back to the start. The README GIF is generated from the
-real `fib.rev` scrubber dump, so the demo artifact stays tied to interpreter
-behavior.
+and see values flow back to the start. The README scrubber GIF is generated
+from the real `fib.rev` scrubber dump. The MNIST/Q31 classification and
+training reversal GIFs are generated from `reverie run` and `reverie reverse`
+over `examples/mnist_identify.rev` and `examples/mnist_reversible_step.rev`,
+so the demo artifacts stay tied to interpreter behavior.
 
 ## Commands
 
@@ -161,10 +163,12 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-Regenerate the demo artifact:
+Regenerate the demo artifacts:
 
 ```sh
 python3 scripts/render_scrubber_gif.py
+python3 scripts/render_mnist_reversal_gif.py
+python3 scripts/render_mnist_training_reversal_gif.py
 ```
 
 Performance benchmarking is intentionally secondary to soundness, but Reverie
