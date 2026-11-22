@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Python package: `crates/reverie-py` (PyO3, abi3 wheels for CPython 3.9+
+  built with maturin) exposes `reverie.load`/`loads`, `Program.run`,
+  `reverse`, `roundtrip`, `timeline` and `inverse_source`, plus
+  `reverie.verify`. Roundtrip proofs are identical to the CLI's. The CLI crate
+  gained a library target with an `embed` module to share that code.
 - Phase 0 skeleton: Rust workspace, five crates, CI, `skip` parser, and CLI
   execution from an empty store.
 - Phase 1 forward core: expressions, updates, swaps, reversible conditionals,

@@ -5,3 +5,8 @@ __pycache__/
 *.swp
 *.swo
 *.snap.new
+.venv/
+*.so
+*.pyd
+.pytest_cache/
+/dist/

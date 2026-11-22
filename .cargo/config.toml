@@ -1,0 +1,4 @@
+[env]
+# Build `reverie-py` as a Python extension module (no libpython link) even
+# under plain `cargo build` / `cargo test --workspace`; maturin sets the same.
+PYO3_BUILD_EXTENSION_MODULE = "1"

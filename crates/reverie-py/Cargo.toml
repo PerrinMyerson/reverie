@@ -1,0 +1,27 @@
+[package]
+name = "reverie-py"
+description = "Python bindings for the Reverie reversible language"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "_reverie"
+crate-type = ["cdylib"]
+# The extension is exercised from Python (pytest), not `cargo test`.
+test = false
+doctest = false
+
+[dependencies]
+ariadne.workspace = true
+pyo3 = { workspace = true, features = ["abi3-py39"] }
+reverie-cli.workspace = true
+reverie-core.workspace = true
+reverie-interp.workspace = true
+reverie-syntax.workspace = true
+serde_json.workspace = true
+
+[build-dependencies]
+pyo3-build-config.workspace = true
