@@ -20,21 +20,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
+      # uv ships standalone CPython builds, including 3.9, which newer
+      # runner images no longer provide through setup-python.
+      - uses: astral-sh/setup-uv@v6
       - name: Build the CLI (for CLI-parity tests)
         run: cargo build -p reverie-cli
       - name: Install package
         shell: bash
         run: |
-          python -m venv .venv
-          if [ -f .venv/Scripts/activate ]; then source .venv/Scripts/activate; else source .venv/bin/activate; fi
-          python -m pip install --upgrade pip
-          python -m pip install maturin pytest numpy
-          maturin develop
-          echo "$VIRTUAL_ENV/bin" >> "$GITHUB_PATH"
-          echo "$VIRTUAL_ENV/Scripts" >> "$GITHUB_PATH"
+          uv venv --python ${{ matrix.python }} .venv
+          uv pip install --python .venv maturin pytest numpy
+          if [ -d .venv/Scripts ]; then bin=.venv/Scripts; else bin=.venv/bin; fi
+          VIRTUAL_ENV="$PWD/.venv" "$bin/maturin" develop
+          dir="$PWD/$bin"
+          if command -v cygpath >/dev/null; then dir=$(cygpath -w "$dir"); fi
+          echo "$dir" >> "$GITHUB_PATH"
       - name: pytest
         run: python -m pytest -v
 
@@ -109,15 +109,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
+      - uses: astral-sh/setup-uv@v6
       - uses: actions/download-artifact@v4
         with:
           name: wheels-linux-x86_64
           path: dist
       - name: Install wheel and run tests against it
         run: |
-          python -m pip install pytest dist/*.whl
+          uv venv --python 3.9 "$RUNNER_TEMP/venv"
+          uv pip install --python "$RUNNER_TEMP/venv" pytest dist/*.whl
           cd "$RUNNER_TEMP"
-          python -m pytest -v "$GITHUB_WORKSPACE/python/tests"
+          "$RUNNER_TEMP/venv/bin/python" -m pytest -v "$GITHUB_WORKSPACE/python/tests"
