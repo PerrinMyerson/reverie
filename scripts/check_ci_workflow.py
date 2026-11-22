@@ -16,7 +16,7 @@ VERIFY_SCRIPT = REPO_ROOT / "scripts" / "verify_janus_performance.py"
 MATERIALIZED_SOURCE_CHECKER = REPO_ROOT / "scripts" / "check_materialized_sources.py"
 CRITERION_CHECKER = REPO_ROOT / "scripts" / "check_criterion_docs.py"
 EXPLAIN_CHECKER = REPO_ROOT / "scripts" / "check_explain_json.py"
-CLI_MAIN = REPO_ROOT / "crates" / "reverie-cli" / "src" / "main.rs"
+CLI_MAIN = REPO_ROOT / "crates" / "reverie-cli" / "src" / "lib.rs"
 MNIST_LINEAR_RUNNER = (
     REPO_ROOT / "crates" / "reverie-cli" / "src" / "bin" / "reverie-mnist-linear.rs"
 )
