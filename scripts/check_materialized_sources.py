@@ -165,6 +165,15 @@ def main() -> int:
     if args.self_test:
         return run_self_tests()
 
+    if sys.platform != "darwin":
+        # Dataless placeholders are an APFS (macOS) feature, and the `ls -O`
+        # flags listing used to detect them is BSD-only. Nothing to check.
+        print(
+            "ok: skipped; APFS dataless placeholders only exist on macOS "
+            f"(platform: {sys.platform})"
+        )
+        return 0
+
     try:
         missing = dataless_files(
             args.paths, include_quarantine=args.include_quarantine
