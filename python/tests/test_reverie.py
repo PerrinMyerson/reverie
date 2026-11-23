@@ -336,3 +336,290 @@ def _json_store(store: Dict[str, Any]) -> Dict[str, Any]:
         return value
 
     return {name: convert(value) for name, value in store.items()}
+
+
+# -- lab / ledger ------------------------------------------------------------
+
+
+def _tiny_run(seed=0, n=10, d=5, h=4, c=3, epochs=2):
+    import random
+
+    from reverie import lab
+
+    rng = random.Random(seed)
+    images = [[lab.to_q31(rng.uniform(-1, 1)) for _ in range(d)] for _ in range(n)]
+    labels = [rng.randrange(c) for _ in range(n)]
+    order = [i for _ in range(epochs) for i in rng.sample(range(n), n)]
+    run = lab.SGDRewind(
+        images=images, labels=labels, order=order, hidden=h, classes=c, lr=lab.to_q31(0.1)
+    )
+    weights = {
+        "w1": [[lab.to_q31(rng.gauss(0, 0.4)) for _ in range(h)] for _ in range(d)],
+        "b1": [0] * h,
+        "w2": [[lab.to_q31(rng.gauss(0, 0.4)) for _ in range(c)] for _ in range(h)],
+        "b2": [0] * c,
+    }
+    return run, weights
+
+
+@pytest.mark.parametrize("engine", ["slot", "tree"])
+def test_sgd_rewinds_exactly_to_any_step(engine):
+    from reverie import lab
+
+    run, weights0 = _tiny_run()
+    run.program = reverie.loads(run.source, engine=engine)
+    final = run.train(weights0)
+    assert run.weights(final) != weights0
+    for step in (0, 3, run.steps - 1):
+        rewound = run.rewind(final, step)
+        replayed = run.train(weights0, stop=step - 1) if step else None
+        expected = run.weights(replayed) if replayed else weights0
+        assert run.weights(rewound) == expected
+        assert all(row == [0] * len(row) for row in rewound["err_tape"][step:])
+    assert lab.SGDRewind.witness(final)["err_tape"][0] != [0] * 3
+
+
+def test_unlearning_is_bit_identical_to_retraining():
+    run, weights0 = _tiny_run()
+    final = run.train(weights0)
+    for sample in range(run.n_samples):
+        active = [0 if index == sample else 1 for index in run.data["order"]]
+        retrained = run.train(weights0, active=active)
+        unlearned = run.unlearn(final, sample)
+        assert run.weights(unlearned) == run.weights(retrained)
+        assert run.weights(unlearned) != run.weights(final)
+
+
+def test_training_matches_plain_python_sgd():
+    """The witness bookkeeping does not change the arithmetic."""
+    run, weights0 = _tiny_run()
+    final = run.train(weights0)
+    fm = lambda a, b: (a * b) >> 31  # noqa: E731
+    w1 = [row[:] for row in weights0["w1"]]
+    b1, w2, b2 = weights0["b1"][:], [row[:] for row in weights0["w2"]], weights0["b2"][:]
+    lr = run.data["lr"]
+    for s in run.data["order"]:
+        x, y = run.data["images"][s], run.data["labels"][s]
+        pre = [sum(fm(x[i], w1[i][j]) for i in range(len(x))) + b1[j] for j in range(len(b1))]
+        act = [max(v, 0) for v in pre]
+        logits = [sum(fm(act[i], w2[i][j]) for i in range(len(act))) + b2[j] for j in range(len(b2))]
+        err = [v - ((1 << 31) if j == y else 0) for j, v in enumerate(logits)]
+        back = [sum(fm(w2[i][j], err[j]) for j in range(len(err))) for i in range(len(act))]
+        delta = [fm(back[i], (1 << 31) if pre[i] > 0 else 0) for i in range(len(act))]
+        for i in range(len(act)):
+            for j in range(len(err)):
+                w2[i][j] -= fm(fm(act[i], err[j]), lr)
+        b2 = [b - fm(e, lr) for b, e in zip(b2, err)]
+        for i in range(len(x)):
+            for j in range(len(delta)):
+                w1[i][j] -= fm(fm(x[i], delta[j]), lr)
+        b1 = [b - fm(dl, lr) for b, dl in zip(b1, delta)]
+    assert run.weights(final) == {"w1": w1, "b1": b1, "w2": w2, "b2": b2}
+
+
+def test_ledger_accounting():
+    from reverie.ledger import code_length_bits, flatten, landauer_joules, ledger
+
+    assert [code_length_bits(v) for v in (0, -1, 1, -2, 2)] == [1, 3, 3, 5, 5]
+    assert list(flatten({"a": [1, [2, True]], "s": reverie.Stack([4])})) == [1, 2, 1, 4]
+    book = ledger({"w": [0, 0, 5], "v": 1}, ["w", "v"])
+    assert book.values == 4 and book.raw_bits == 256
+    assert book.entries[0].nonzero == 1
+    assert book.coded_bits == 1 + 1 + code_length_bits(5) + code_length_bits(1)
+    assert landauer_joules(1, 300) == pytest.approx(2.87e-21, rel=1e-2)
+
+
+def test_proof_with_inexactly_parsed_floats_verifies():
+    """Regression: `verify` compared the replayed ML profile with the parsed
+    one by raw equality, and serde_json's default float parser can land one
+    ulp off (here on witness_to_state_payload_ratio = 1.6744927793036237)."""
+    import random
+
+    from reverie import lab
+
+    rng = random.Random(0)
+    n, d, h, c = 600, 64, 32, 10
+    images = [[lab.to_q31(rng.uniform(0, 1)) for _ in range(d)] for _ in range(n)]
+    order = list(range(n)) * 3
+    run = lab.SGDRewind(
+        images=images,
+        labels=[i % c for i in range(n)],
+        order=order,
+        hidden=h,
+        classes=c,
+        lr=lab.to_q31(0.03),
+    )
+    seeds = dict(run.data)
+    seeds.update(
+        w1=[[lab.to_q31(rng.gauss(0, 0.2)) for _ in range(h)] for _ in range(d)],
+        b1=[0] * h,
+        w2=[[lab.to_q31(rng.gauss(0, 0.2)) for _ in range(c)] for _ in range(h)],
+        b2=[0] * c,
+        active=[1] * len(order),
+        start=0,
+        stop=len(order) - 1,
+    )
+    proof = run.program.roundtrip(seeds)
+    report = reverie.verify(proof, source=run.program)
+    assert report["passed"], [k for k, ok in report["checks"].items() if not ok]
+
+
+def test_search_witness_is_minimal_and_exact():
+    import itertools
+    import math
+
+    from reverie import lab
+
+    # A Reverie program that maps a 3-digit code to a checksum (not injective).
+    program = reverie.loads("s += (a * 7) ^ (b * 3) ^ c")
+    domain = list(itertools.product(range(8), repeat=3))
+    f = lambda code: program.run(a=code[0], b=code[1], c=code[2], s=0)["s"]  # noqa: E731
+    witness = lab.SearchWitness(f, domain)
+    total_bits = 0
+    sizes = {}
+    for code in domain:
+        output, index, size = witness.encode(code)
+        assert witness.decode(output, index) == code
+        total_bits += lab.SearchWitness.bits(size)
+        sizes[output] = size
+    # H(X | f(X)) for uniform X, and the per-input index code reaches it to
+    # within one bit.
+    h = sum(size * math.log2(size) for size in sizes.values()) / len(domain)
+    assert h <= total_bits / len(domain) < h + 1
+
+
+def test_sgd_training_is_bit_exact_across_platforms():
+    """A golden fingerprint of a small Q31 training run. CI runs this on
+    Linux, macOS and Windows: integer semantics make the result identical
+    everywhere, which float training does not guarantee. Inputs come from
+    integer-only randomness so platform libm differences cannot leak in."""
+    import hashlib
+    import json
+    import random
+
+    from reverie import lab
+
+    rng = random.Random(11)
+    q = lambda bound: rng.randint(-bound, bound)  # noqa: E731
+    n, d, h, c = 16, 6, 5, 3
+    run = lab.SGDRewind(
+        images=[[q(1 << 31) for _ in range(d)] for _ in range(n)],
+        labels=[rng.randrange(c) for _ in range(n)],
+        order=[i for _ in range(3) for i in range(n)],
+        hidden=h,
+        classes=c,
+        lr=lab.to_q31(0.125),
+    )
+    weights0 = {
+        "w1": [[q(1 << 30) for _ in range(h)] for _ in range(d)],
+        "b1": [0] * h,
+        "w2": [[q(1 << 30) for _ in range(c)] for _ in range(h)],
+        "b2": [0] * c,
+    }
+    final = run.train(weights0)
+    digest = hashlib.sha256(json.dumps(run.weights(final), sort_keys=True).encode()).hexdigest()
+    assert digest == GOLDEN_SGD_DIGEST
+    assert run.weights(run.rewind(final, 0)) == weights0
+
+
+GOLDEN_SGD_DIGEST = "4b24d3e45d6c28ca1f1bfeb68963b74589bc18030bf5a51fba63c0568585c2c5"
+
+
+# -- rollback netcode, sagas, migrations ---------------------------------------
+
+
+def test_rollback_netcode_matches_ground_truth_both_ways():
+    from reverie import rollback as rb
+
+    match = rb.Match(n_projectiles=3, frames=90, seed=2)
+    truth = match.ground_truth()
+    back = match.program.reverse(truth)
+    assert all(back[k] == match.state0[k] for k in rb.STATE)
+    for mode in ("snapshot", "reverse"):
+        session = rb.Rollback(match, delay=5, mode=mode)
+        out = session.play()
+        assert session.stats.rollbacks > 0
+        assert all(out[k] == truth[k] for k in rb.STATE), mode
+    # Reverse mode ends with exactly the ground truth's witness too.
+    assert all(out[k] == truth[k] for k in rb.WITNESS)
+
+
+def test_saga_compensations_are_never_silently_wrong():
+    import collections
+    import random
+
+    from reverie import saga
+
+    with pytest.raises(reverie.CheckError, match="reads the value being changed"):
+        reverie.loads(saga.LOSSY_LOYALTY_SOURCE)
+    programs = saga._programs()
+    for style in ("loyalty", "loyalty_delta"):
+        rng = random.Random(7)
+        tally = collections.Counter(
+            saga.run_trial(rng, programs, loyalty=style)["reverie"] for _ in range(400)
+        )
+        assert tally["silent_corruption"] == 0, tally
+        assert tally["correct"] > 0
+        if style == "loyalty_delta":
+            assert tally["loud_failure"] == 0, tally
+
+
+def test_migration_down_is_exact_and_flags_edited_rows():
+    import random
+
+    from reverie import migrate as mg
+
+    with pytest.raises(reverie.CheckError):
+        reverie.loads(mg.LOSSY_DROP_SOURCE)
+    rng = random.Random(3)
+    v1 = mg.random_rows(200, rng)
+    program = reverie.loads(mg.migration_source(200))
+    up = program.run(v1)
+    assert all(v == 0 for c in mg.V1 for v in up[c])
+    down = program.reverse(up)
+    assert all(down[c] == v1[c] for c in mg.V1)
+    edited = {r for r in range(200) if v1["currency"][r] != 0}
+    for r in edited:
+        up["usd"][r] += 1
+    rolled = program.reverse(up)
+    flagged = {r for r in range(200) if any(rolled[c][r] for c in mg.V2 + mg.WITNESS)}
+    assert flagged <= edited
+    assert all(rolled[c][r] == v1[c][r] for c in mg.V1 for r in range(200) if r not in edited)
+
+
+# -- DNA -----------------------------------------------------------------------
+
+
+def test_dna_codec_round_trips_and_rejects_homopolymers():
+    import os
+
+    from reverie import dna
+
+    for n in (1, 9, 40):
+        payload = os.urandom(n)
+        strand = dna.encode(payload)
+        assert len(strand) == 1 + 6 * n
+        assert all(a != b for a, b in zip(strand, strand[1:]))
+        assert dna.decode(strand) == payload
+    strand = dna.encode(b"hi")
+    with pytest.raises(reverie.ExecutionError):
+        dna.decode(strand[:3] + strand[2] + strand[4:])  # creates a homopolymer
+
+
+def test_dna_recorders():
+    from reverie import dna
+
+    tape = reverie.loads(dna.tape_recorder_source(4, 3))
+    out = tape.run(history=[2, 0, 1, 2])
+    assert out["history"] == [0, 0, 0, 0]
+    assert tape.reverse(out)["history"] == [2, 0, 1, 2]
+    flips = reverie.loads(dna.flip_recorder_source(4, 3)).run(history=[2, 0, 2, 1])
+    assert flips["site"] == [1, 1, 1] and flips["repeats"] == [0, 0, 1, 0]
+    states = dna.recorder_states(dna.RECORDERS["site flips (integrase switches)"], 3, 2)
+    h, forgotten = dna.history_entropy(states)
+    import math
+
+    # States {0}, {1} hold one history each; {0, 1} holds the other six.
+    assert h == 3 and forgotten == pytest.approx(6 * math.log2(6) / 8)
+    tape_states = dna.recorder_states(dna.RECORDERS["ordered tape (CRISPR array, DNA Typewriter)"], 4, 3)
+    assert dna.history_entropy(tape_states)[1] == 0

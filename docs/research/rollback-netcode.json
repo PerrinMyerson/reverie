@@ -1,0 +1,137 @@
+{
+  "host": "macOS-26.5.2-arm64-arm-64bit, Python 3.12.13",
+  "rows": [
+    {
+      "projectiles": 0,
+      "correctness": {
+        "snapshot": {
+          "state_matches_truth": true,
+          "witness_matches_truth": null,
+          "rollbacks": 48,
+          "frames_resimulated": 283,
+          "frames_reversed": 0,
+          "max_depth": 6
+        },
+        "reverse": {
+          "state_matches_truth": true,
+          "witness_matches_truth": true,
+          "rollbacks": 48,
+          "frames_resimulated": 283,
+          "frames_reversed": 283,
+          "max_depth": 6
+        }
+      },
+      "reverse_restores_initial_state": true,
+      "per_frame": {
+        "snapshot_values": 12,
+        "snapshot_coded_bits": 174,
+        "witness_values": 12.0,
+        "witness_coded_bits": 25.033333333333335,
+        "witness_nonzero_entries": 1.6055555555555556
+      },
+      "engine_us_per_frame": {
+        "forward": 3.050346664773921,
+        "backward": 3.8810416663181972
+      }
+    },
+    {
+      "projectiles": 16,
+      "correctness": {
+        "snapshot": {
+          "state_matches_truth": true,
+          "witness_matches_truth": null,
+          "rollbacks": 49,
+          "frames_resimulated": 294,
+          "frames_reversed": 0,
+          "max_depth": 6
+        },
+        "reverse": {
+          "state_matches_truth": true,
+          "witness_matches_truth": true,
+          "rollbacks": 49,
+          "frames_resimulated": 294,
+          "frames_reversed": 294,
+          "max_depth": 6
+        }
+      },
+      "reverse_restores_initial_state": true,
+      "per_frame": {
+        "snapshot_values": 72,
+        "snapshot_coded_bits": 1254,
+        "witness_values": 42.0,
+        "witness_coded_bits": 54.84444444444444,
+        "witness_nonzero_entries": 1.7166666666666666
+      },
+      "engine_us_per_frame": {
+        "forward": 8.93437500053551,
+        "backward": 10.134723330944931
+      }
+    },
+    {
+      "projectiles": 64,
+      "correctness": {
+        "snapshot": {
+          "state_matches_truth": true,
+          "witness_matches_truth": null,
+          "rollbacks": 39,
+          "frames_resimulated": 226,
+          "frames_reversed": 0,
+          "max_depth": 6
+        },
+        "reverse": {
+          "state_matches_truth": true,
+          "witness_matches_truth": true,
+          "rollbacks": 39,
+          "frames_resimulated": 226,
+          "frames_reversed": 226,
+          "max_depth": 6
+        }
+      },
+      "reverse_restores_initial_state": true,
+      "per_frame": {
+        "snapshot_values": 264,
+        "snapshot_coded_bits": 4492,
+        "witness_values": 138.0,
+        "witness_coded_bits": 152.77777777777777,
+        "witness_nonzero_entries": 2.311111111111111
+      },
+      "engine_us_per_frame": {
+        "forward": 25.747430008777883,
+        "backward": 28.08097166659233
+      }
+    },
+    {
+      "projectiles": 256,
+      "correctness": {
+        "snapshot": {
+          "state_matches_truth": true,
+          "witness_matches_truth": null,
+          "rollbacks": 39,
+          "frames_resimulated": 229,
+          "frames_reversed": 0,
+          "max_depth": 6
+        },
+        "reverse": {
+          "state_matches_truth": true,
+          "witness_matches_truth": true,
+          "rollbacks": 39,
+          "frames_resimulated": 229,
+          "frames_reversed": 229,
+          "max_depth": 6
+        }
+      },
+      "reverse_restores_initial_state": true,
+      "per_frame": {
+        "snapshot_values": 1032,
+        "snapshot_coded_bits": 18246,
+        "witness_values": 522.0,
+        "witness_coded_bits": 551.7111111111111,
+        "witness_nonzero_entries": 7.355555555555555
+      },
+      "engine_us_per_frame": {
+        "forward": 93.3166666679123,
+        "backward": 100.99909667284616
+      }
+    }
+  ]
+}

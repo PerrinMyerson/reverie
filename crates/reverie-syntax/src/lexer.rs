@@ -120,6 +120,8 @@ enum RawToken {
     MinusMinus,
     #[token("^=")]
     XorEq,
+    #[token("*=")]
+    StarEq,
     #[token("<=>")]
     Swap,
 
@@ -231,6 +233,7 @@ pub enum Token {
     PlusPlus,
     MinusMinus,
     XorEq,
+    StarEq,
     Swap,
     EqEq,
     BangEq,
@@ -312,6 +315,7 @@ impl Token {
             Self::PlusPlus => "`++`".to_owned(),
             Self::MinusMinus => "`--`".to_owned(),
             Self::XorEq => "`^=`".to_owned(),
+            Self::StarEq => "`*=`".to_owned(),
             Self::Swap => "`<=>`".to_owned(),
             Self::EqEq => "`==`".to_owned(),
             Self::BangEq => "`!=`".to_owned(),
@@ -417,6 +421,7 @@ fn token_from_raw(raw: RawToken, slice: &str, span: SourceSpan) -> Result<Token,
         RawToken::PlusPlus => Token::PlusPlus,
         RawToken::MinusMinus => Token::MinusMinus,
         RawToken::XorEq => Token::XorEq,
+        RawToken::StarEq => Token::StarEq,
         RawToken::Swap => Token::Swap,
         RawToken::EqEq => Token::EqEq,
         RawToken::BangEq => Token::BangEq,

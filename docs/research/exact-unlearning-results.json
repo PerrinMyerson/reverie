@@ -1,0 +1,374 @@
+{
+  "schema": "reverie_exact_unlearning_v1",
+  "dataset": "scikit-learn digits (8x8)",
+  "config": {
+    "train": 600,
+    "test": 500,
+    "features": 64,
+    "hidden": 32,
+    "classes": 10,
+    "epochs": 3,
+    "steps": 1800,
+    "lr": 0.03,
+    "seed": 7,
+    "engine": "slot"
+  },
+  "host": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "python": "3.12.13",
+    "reverie": "0.1.0"
+  },
+  "accuracy": {
+    "train_initial": 0.04,
+    "train_final": 0.9466666666666667,
+    "test_final": 0.948
+  },
+  "timing_seconds": {
+    "train": 0.14714850000018487,
+    "rewind_to_start": 0.14830016600171803,
+    "roundtrip_proof": 0.3416138340035104
+  },
+  "rewind_to_start_exact": true,
+  "unlearning": [
+    {
+      "sample": 229,
+      "first_use_step": 19,
+      "steps_rewound": 1781,
+      "unlearn_seconds": 0.293519541999558,
+      "retrain_seconds": 0.1467859589974978,
+      "bit_identical_to_retrain": true,
+      "weights_changed": true
+    },
+    {
+      "sample": 217,
+      "first_use_step": 41,
+      "steps_rewound": 1759,
+      "unlearn_seconds": 0.2863700830057496,
+      "retrain_seconds": 0.14456808300019475,
+      "bit_identical_to_retrain": true,
+      "weights_changed": true
+    },
+    {
+      "sample": 226,
+      "first_use_step": 238,
+      "steps_rewound": 1562,
+      "unlearn_seconds": 0.25586741600272944,
+      "retrain_seconds": 0.14934708399960073,
+      "bit_identical_to_retrain": true,
+      "weights_changed": true
+    },
+    {
+      "sample": 545,
+      "first_use_step": 256,
+      "steps_rewound": 1544,
+      "unlearn_seconds": 0.26011879200086696,
+      "retrain_seconds": 0.14761512500263052,
+      "bit_identical_to_retrain": true,
+      "weights_changed": true
+    },
+    {
+      "sample": 392,
+      "first_use_step": 267,
+      "steps_rewound": 1533,
+      "unlearn_seconds": 0.25469108300603693,
+      "retrain_seconds": 0.14597904199763434,
+      "bit_identical_to_retrain": true,
+      "weights_changed": true
+    },
+    {
+      "sample": 454,
+      "first_use_step": 366,
+      "steps_rewound": 1434,
+      "unlearn_seconds": 0.23860420900018653,
+      "retrain_seconds": 0.15156650000426453,
+      "bit_identical_to_retrain": true,
+      "weights_changed": true
+    },
+    {
+      "sample": 64,
+      "first_use_step": 400,
+      "steps_rewound": 1400,
+      "unlearn_seconds": 0.23842091700498713,
+      "retrain_seconds": 0.15032587500172667,
+      "bit_identical_to_retrain": true,
+      "weights_changed": true
+    },
+    {
+      "sample": 62,
+      "first_use_step": 455,
+      "steps_rewound": 1345,
+      "unlearn_seconds": 0.2296472090019961,
+      "retrain_seconds": 0.15131016600207658,
+      "bit_identical_to_retrain": true,
+      "weights_changed": true
+    },
+    {
+      "sample": 265,
+      "first_use_step": 507,
+      "steps_rewound": 1293,
+      "unlearn_seconds": 0.22012050000193994,
+      "retrain_seconds": 0.15394641699822387,
+      "bit_identical_to_retrain": true,
+      "weights_changed": true
+    },
+    {
+      "sample": 256,
+      "first_use_step": 515,
+      "steps_rewound": 1285,
+      "unlearn_seconds": 0.22115891699650092,
+      "retrain_seconds": 0.1507102079995093,
+      "bit_identical_to_retrain": true,
+      "weights_changed": true
+    },
+    {
+      "sample": 309,
+      "first_use_step": 555,
+      "steps_rewound": 1245,
+      "unlearn_seconds": 0.21451462500408525,
+      "retrain_seconds": 0.15096179099782603,
+      "bit_identical_to_retrain": true,
+      "weights_changed": true
+    },
+    {
+      "sample": 164,
+      "first_use_step": 567,
+      "steps_rewound": 1233,
+      "unlearn_seconds": 0.21130095899570733,
+      "retrain_seconds": 0.1510341659959522,
+      "bit_identical_to_retrain": true,
+      "weights_changed": true
+    }
+  ],
+  "memory": {
+    "checkpoint_interval_at_memory_parity": 58,
+    "sqrt_checkpoint_interval": 42,
+    "reverse_traversal_sqrt_checkpoint_values": 204850,
+    "reverse_traversal_witness_values": 78010,
+    "parameters": 2410,
+    "steps": 1800,
+    "witness_values_per_step": 42,
+    "checkpoint_values_per_step": 2410,
+    "bennett_trace_values_per_step": 180,
+    "witness_raw_bits": 4838400,
+    "witness_coded_bits": 2019394,
+    "checkpoints_raw_bits": 277632000,
+    "bennett_trace_raw_bits": 20736000,
+    "final_weights_coded_bits": 135874,
+    "landauer_joules_at_300K": 5.797637534654664e-15,
+    "ledger": {
+      "values": 75600,
+      "coded_bits": 2019394,
+      "raw_bits": 4838400,
+      "landauer_joules": 5.797637534654664e-15,
+      "temperature_kelvin": 300.0,
+      "entries": [
+        {
+          "name": "err_tape",
+          "values": 18000,
+          "nonzero": 18000,
+          "coded_bits": 1021492,
+          "raw_bits": 1152000
+        },
+        {
+          "name": "delta_tape",
+          "values": 57600,
+          "nonzero": 17113,
+          "coded_bits": 997902,
+          "raw_bits": 3686400
+        }
+      ]
+    }
+  },
+  "attribution": {
+    "spearman_first_epoch_bits_vs_final_error": -0.06432426915658501,
+    "spearman_last_epoch_bits_vs_final_error": 0.08051263677159577,
+    "mean_last_epoch_bits_misclassified": 1117.0,
+    "mean_last_epoch_bits_correct": 1082.6514084507041,
+    "misclassified_training_samples": 32,
+    "bits_per_step_first_epoch": 1154.74,
+    "bits_per_step_last_epoch": 1084.4833333333333
+  },
+  "erasure": {
+    "samples": 500,
+    "exact_reconstruction": true,
+    "relu_witness_bits": 727464,
+    "activation_bits": 260372,
+    "readout_logit_bits": 281904,
+    "dead_neurons": [
+      31
+    ],
+    "linear_neurons": [],
+    "mean_erased_fraction": 0.7406874999999999,
+    "ablated_k": 4,
+    "accuracy_ablate_most_erasing": 0.948,
+    "accuracy_ablate_least_erasing": 0.746,
+    "neurons": [
+      {
+        "neuron": 0,
+        "erased_fraction": 0.986,
+        "coded_bits": 30334
+      },
+      {
+        "neuron": 1,
+        "erased_fraction": 0.994,
+        "coded_bits": 31036
+      },
+      {
+        "neuron": 2,
+        "erased_fraction": 0.252,
+        "coded_bits": 7722
+      },
+      {
+        "neuron": 3,
+        "erased_fraction": 0.614,
+        "coded_bits": 18634
+      },
+      {
+        "neuron": 4,
+        "erased_fraction": 0.316,
+        "coded_bits": 9464
+      },
+      {
+        "neuron": 5,
+        "erased_fraction": 0.798,
+        "coded_bits": 24310
+      },
+      {
+        "neuron": 6,
+        "erased_fraction": 0.61,
+        "coded_bits": 18326
+      },
+      {
+        "neuron": 7,
+        "erased_fraction": 0.998,
+        "coded_bits": 30854
+      },
+      {
+        "neuron": 8,
+        "erased_fraction": 0.986,
+        "coded_bits": 30156
+      },
+      {
+        "neuron": 9,
+        "erased_fraction": 0.752,
+        "coded_bits": 23448
+      },
+      {
+        "neuron": 10,
+        "erased_fraction": 0.976,
+        "coded_bits": 30190
+      },
+      {
+        "neuron": 11,
+        "erased_fraction": 0.994,
+        "coded_bits": 31026
+      },
+      {
+        "neuron": 12,
+        "erased_fraction": 0.514,
+        "coded_bits": 15334
+      },
+      {
+        "neuron": 13,
+        "erased_fraction": 0.702,
+        "coded_bits": 21286
+      },
+      {
+        "neuron": 14,
+        "erased_fraction": 0.408,
+        "coded_bits": 12350
+      },
+      {
+        "neuron": 15,
+        "erased_fraction": 0.742,
+        "coded_bits": 22510
+      },
+      {
+        "neuron": 16,
+        "erased_fraction": 0.996,
+        "coded_bits": 30880
+      },
+      {
+        "neuron": 17,
+        "erased_fraction": 0.88,
+        "coded_bits": 26908
+      },
+      {
+        "neuron": 18,
+        "erased_fraction": 0.21,
+        "coded_bits": 6474
+      },
+      {
+        "neuron": 19,
+        "erased_fraction": 0.452,
+        "coded_bits": 13508
+      },
+      {
+        "neuron": 20,
+        "erased_fraction": 0.748,
+        "coded_bits": 23010
+      },
+      {
+        "neuron": 21,
+        "erased_fraction": 0.998,
+        "coded_bits": 30504
+      },
+      {
+        "neuron": 22,
+        "erased_fraction": 0.946,
+        "coded_bits": 29196
+      },
+      {
+        "neuron": 23,
+        "erased_fraction": 0.796,
+        "coded_bits": 24178
+      },
+      {
+        "neuron": 24,
+        "erased_fraction": 0.988,
+        "coded_bits": 30726
+      },
+      {
+        "neuron": 25,
+        "erased_fraction": 0.588,
+        "coded_bits": 18218
+      },
+      {
+        "neuron": 26,
+        "erased_fraction": 0.894,
+        "coded_bits": 27158
+      },
+      {
+        "neuron": 27,
+        "erased_fraction": 0.996,
+        "coded_bits": 31168
+      },
+      {
+        "neuron": 28,
+        "erased_fraction": 0.56,
+        "coded_bits": 17088
+      },
+      {
+        "neuron": 29,
+        "erased_fraction": 0.526,
+        "coded_bits": 15952
+      },
+      {
+        "neuron": 30,
+        "erased_fraction": 0.482,
+        "coded_bits": 14402
+      },
+      {
+        "neuron": 31,
+        "erased_fraction": 1.0,
+        "coded_bits": 31114
+      }
+    ]
+  },
+  "proof": {
+    "passed": true,
+    "fingerprint": "3c792c1ec67d5046e3449d1a6560911961351a01044c577df559ddbcdd8f2704",
+    "verified": true,
+    "failed_checks": []
+  }
+}

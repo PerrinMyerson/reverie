@@ -550,6 +550,7 @@ fn update_op_text(op: UpdateOp) -> &'static str {
         UpdateOp::Add => "+=",
         UpdateOp::Sub => "-=",
         UpdateOp::Xor => "^=",
+        UpdateOp::Mul => "*=",
     }
 }
 

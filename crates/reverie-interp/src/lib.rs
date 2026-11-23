@@ -1537,6 +1537,7 @@ fn update_label(op: UpdateOp) -> &'static str {
         UpdateOp::Add => "+=",
         UpdateOp::Sub => "-=",
         UpdateOp::Xor => "^=",
+        UpdateOp::Mul => "*=",
     }
 }
 
@@ -2241,6 +2242,35 @@ pub(crate) fn eval_tensor_builtin_values(
     }
 }
 
+/// `current *= rhs` for an odd `rhs`, element-wise over int tensors. Odd
+/// factors are bijections on wrapping 64-bit integers.
+pub(crate) fn mul_update_value(current: &Value, rhs: &Value) -> Result<Value, String> {
+    let Value::Int(factor) = rhs else {
+        return Err(format!(
+            "multiplicative update needs an odd int factor, found {rhs}"
+        ));
+    };
+    if factor & 1 == 0 {
+        return Err(format!(
+            "multiplicative update factor {factor} is even, so `*=` would lose information"
+        ));
+    }
+    fn scale(value: &Value, factor: i64) -> Result<Value, String> {
+        match value {
+            Value::Int(value) => Ok(Value::Int(value.wrapping_mul(factor))),
+            Value::Array(values) => values
+                .iter()
+                .map(|value| scale(value, factor))
+                .collect::<Result<Vec<_>, _>>()
+                .map(Value::Array),
+            other => Err(format!(
+                "multiplicative update target must be an int or int tensor, found {other}"
+            )),
+        }
+    }
+    scale(current, *factor)
+}
+
 fn update_add_sub_value(
     current: &Value,
     rhs: &Value,
@@ -2251,7 +2281,7 @@ fn update_add_sub_value(
         (Value::Int(current), Value::Int(rhs)) => Ok(Value::Int(match op {
             UpdateOp::Add => current.wrapping_add(*rhs),
             UpdateOp::Sub => current.wrapping_sub(*rhs),
-            UpdateOp::Xor => unreachable!("xor update handled separately"),
+            UpdateOp::Xor | UpdateOp::Mul => unreachable!("xor/mul updates handled separately"),
         })),
         (Value::Array(current), Value::Array(rhs)) if current.len() == rhs.len() => current
             .iter()
@@ -3080,6 +3110,12 @@ fn updated_value(
             let current = eval_place(target, state)?;
             let rhs = eval(expr, state)?;
             update_add_sub_value(&current, &rhs, UpdateOp::Sub, expr.span.clone())
+        }
+        UpdateOp::Mul => {
+            let current = eval_place(target, state)?;
+            let rhs = eval(expr, state)?;
+            mul_update_value(&current, &rhs)
+                .map_err(|message| RuntimeError::at(message, expr.span.clone()))
         }
         UpdateOp::Xor => match (eval_place(target, state)?, eval(expr, state)?) {
             (Value::Int(current), Value::Int(rhs)) => Ok(Value::Int(current ^ rhs)),

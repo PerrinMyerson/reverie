@@ -2230,7 +2230,11 @@ fn verify_roundtrip_proof_with_source(
                     .pointer("/payload/ml_profile")
                     .cloned()
                     .unwrap_or(JsonValue::Null);
-                replay_ml_profile_matches = !ml_profile_present || replay_ml_profile == ml_profile;
+                // Compare normalized forms: serde_json's default float parser
+                // can land one ulp away from the value that was serialized, so
+                // raw equality fails on proofs whose profile holds such floats.
+                replay_ml_profile_matches = !ml_profile_present
+                    || sha256_json(&replay_ml_profile) == sha256_json(&ml_profile);
             }
         }
     }

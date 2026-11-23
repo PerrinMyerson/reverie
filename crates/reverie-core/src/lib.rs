@@ -142,7 +142,16 @@ pub fn invert_stmt(statement: &SpannedStmt) -> SpannedStmt {
         Stmt::Update { target, op, expr } => Stmt::Update {
             target: target.clone(),
             op: invert_update_op(*op),
-            expr: expr.clone(),
+            expr: match (op, odd_constant(expr)) {
+                (UpdateOp::Mul, Some(value)) => Spanned::new(
+                    Expr::Int {
+                        value: odd_inverse_mod_2_64(value),
+                        unit: None,
+                    },
+                    expr.span.clone(),
+                ),
+                _ => expr.clone(),
+            },
         },
         Stmt::Swap { left, right } => Stmt::Swap {
             left: left.clone(),
@@ -710,12 +719,60 @@ fn display_place(place: &Place) -> String {
     }
 }
 
+fn is_int_or_int_tensor(info: &TypeInfo) -> bool {
+    match info {
+        TypeInfo::Unknown | TypeInfo::Int(_) => true,
+        TypeInfo::Array(element) => is_int_or_int_tensor(element),
+        TypeInfo::Bool | TypeInfo::Stack => false,
+    }
+}
+
 fn invert_update_op(op: UpdateOp) -> UpdateOp {
     match op {
         UpdateOp::Add => UpdateOp::Sub,
         UpdateOp::Sub => UpdateOp::Add,
         UpdateOp::Xor => UpdateOp::Xor,
+        UpdateOp::Mul => UpdateOp::Mul,
     }
+}
+
+/// The value of an odd integer constant (`3`, `-5`, `(0 - 5)`), the only
+/// right-hand sides a multiplicative update `x *= c` accepts. Literals combined
+/// with unary minus and `+`, `-`, `*` are folded with wrapping arithmetic.
+pub fn odd_constant(expr: &SpannedExpr) -> Option<i64> {
+    fn fold(expr: &SpannedExpr) -> Option<i64> {
+        match &expr.node {
+            Expr::Int { value, unit: None } => Some(*value),
+            Expr::Unary {
+                op: UnaryOp::Neg,
+                expr,
+            } => fold(expr).map(i64::wrapping_neg),
+            Expr::Binary { op, left, right } => {
+                let (left, right) = (fold(left)?, fold(right)?);
+                match op {
+                    BinaryOp::Add => Some(left.wrapping_add(right)),
+                    BinaryOp::Sub => Some(left.wrapping_sub(right)),
+                    BinaryOp::Mul => Some(left.wrapping_mul(right)),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+    fold(expr).filter(|value| value & 1 == 1)
+}
+
+/// The inverse of an odd `value` modulo 2^64, so that
+/// `value.wrapping_mul(inverse) == 1`.
+pub fn odd_inverse_mod_2_64(value: i64) -> i64 {
+    debug_assert!(value & 1 == 1, "only odd values are invertible mod 2^64");
+    // Newton's iteration doubles the number of correct low bits each step;
+    // `value` itself is correct to 3 bits for any odd value.
+    let mut inverse = value;
+    for _ in 0..5 {
+        inverse = inverse.wrapping_mul(2i64.wrapping_sub(value.wrapping_mul(inverse)));
+    }
+    inverse
 }
 
 fn negate_expr(expr: &SpannedExpr) -> SpannedExpr {
@@ -1271,6 +1328,24 @@ fn check_stmt_units(
                             statement.span.clone(),
                             expr.span.clone(),
                         )?;
+                    }
+                }
+                UpdateOp::Mul => {
+                    if odd_constant(expr).is_none() {
+                        return Err(CoreError::with_labels(
+                            "multiplicative update needs an odd integer constant",
+                            statement.span.clone(),
+                            vec![CoreLabel::new(
+                                expr.span.clone(),
+                                "`x *= c` is only invertible mod 2^64 when `c` is an odd literal",
+                            )],
+                        ));
+                    }
+                    if !is_int_or_int_tensor(&target_type) {
+                        return Err(CoreError::new(
+                            "multiplicative update target must be an int or int tensor",
+                            statement.span.clone(),
+                        ));
                     }
                 }
                 UpdateOp::Xor => {

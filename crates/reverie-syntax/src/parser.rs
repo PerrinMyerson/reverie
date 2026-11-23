@@ -463,6 +463,7 @@ fn stmt_parser(
             just(Token::MinusEq).to(UpdateOp::Sub),
             just(Token::XorEq).to(UpdateOp::Xor),
             just(Token::BangEq).to(UpdateOp::Xor),
+            just(Token::StarEq).to(UpdateOp::Mul),
         ));
 
         let update = place
@@ -2493,7 +2494,7 @@ delocal n = 2
             @r###"
 [
     SyntaxDiagnostic {
-        message: "expected `!=`, `++`, `+=`, `--`, `-=`, `:`, `<=>`, `[` or `^=`, found end of input",
+        message: "expected `!=`, `*=`, `++`, `+=`, `--`, `-=`, `:`, `<=>`, `[` or `^=`, found end of input",
         span: 4..4,
         label: "the parser got stuck here",
     },
