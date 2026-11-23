@@ -678,3 +678,123 @@ def test_console_script_runs_the_cli(capfd, examples):
     assert main(["check", str(examples / "irreversible_update.rev")]) == 1
     assert "hint:" in capfd.readouterr().err
     assert main(["--version"]) == 0
+
+
+# -- general runners -------------------------------------------------------------
+
+
+def _checkout_saga():
+    from reverie import saga as demo
+    from reverie.runtime import Saga, Step
+
+    return Saga(
+        [
+            Step("reserve", demo.STEPS["reserve"], params=("item", "qty")),
+            Step("charge", demo.STEPS["charge"], params=("amount",)),
+            Step("loyalty", demo.STEPS["loyalty_delta"], params=("earned",)),
+            Step("ship", demo.STEPS["ship"]),
+        ]
+    )
+
+
+def _world(quota):
+    return {
+        "stock": [5, 5, 5, 5],
+        "reserved": [0] * 4,
+        "wallet": 10_000,
+        "merchant": 0,
+        "fees": 0,
+        "points": 990,
+        "quota": quota,
+        "shipments": 0,
+    }
+
+
+PARAMS = {"item": 1, "qty": 2, "amount": 3000, "earned": 50}
+
+
+def test_saga_commits_and_compensates():
+    import copy
+
+    saga = _checkout_saga()
+    world = _world(quota=1)
+    assert saga.execute(world, PARAMS).status == "committed"
+    assert world["points"] == 1000 and world["stock"][1] == 3 and world["shipments"] == 1
+
+    world = _world(quota=0)
+    before = copy.deepcopy(world)
+    result = saga.execute(world, PARAMS)
+    assert (result.status, result.failed_step) == ("compensated", "ship")
+    assert world == before
+
+
+def test_saga_compensation_resumes_from_a_stored_log():
+    import json
+
+    from reverie.runtime import Saga
+
+    saga = _checkout_saga()
+    steps_but_ship = Saga(saga.steps[:3])
+    world = _world(quota=0)
+    committed = steps_but_ship.execute(world, PARAMS)
+    stored = json.loads(committed.to_json())["log"]  # e.g. read back after a crash
+    world["wallet"] += 777  # someone else's deposit in the meantime
+    assert saga.compensate(world, stored).status == "compensated"
+    assert world == dict(_world(quota=0), wallet=10_777)
+
+
+def test_migration_dict_and_sqlite():
+    import random
+    import sqlite3
+
+    from reverie import migrate as mg
+    from reverie.runtime import Migration
+
+    simple = Migration(
+        "cents[r] += dollars[r] * 100; dollars[r] -= cents[r] / 100", old=["dollars"], new=["cents"]
+    )
+    up = simple.up({"dollars": [1, 2]})
+    assert up == {"cents": [100, 200]}
+    assert simple.down(up) == ({"dollars": [1, 2]}, simple.down(up)[1])
+    with pytest.raises(reverie.CheckError):
+        Migration("dollars[r] -= dollars[r]", old=["dollars"], new=[])
+
+    if tuple(int(x) for x in sqlite3.sqlite_version.split(".")) < (3, 35):
+        pytest.skip("SQLite DROP COLUMN needs 3.35+")
+    migration = mg.migration()
+    table = mg.random_rows(30, random.Random(5))
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE t (name TEXT, " + ", ".join(f"{c} INTEGER" for c in mg.V1) + ")")
+    conn.executemany(
+        f"INSERT INTO t VALUES (?, {', '.join('?' * len(mg.V1))})",
+        [(f"r{i}", *[table[c][i] for c in mg.V1]) for i in range(30)],
+    )
+    before = conn.execute("SELECT * FROM t ORDER BY rowid").fetchall()
+    assert migration.up_sqlite(conn, "t") == 30
+    assert [r[1] for r in conn.execute("PRAGMA table_info(t)")] == ["name", *mg.V2]
+    assert migration.down_sqlite(conn, "t").flagged_rows == []
+    assert conn.execute("SELECT * FROM t ORDER BY rowid").fetchall() == before
+
+
+def test_simulation_steps_and_rewinds_exactly():
+    from reverie import rollback as rb
+    from reverie.runtime import Simulation
+
+    match = rb.Match(n_projectiles=2, frames=40, seed=3)
+    sim = Simulation(match.program, state=match.state0, inputs={"move": match.move, "attack": match.attack})
+    midway = sim.step(20)
+    sim.step(20)
+    assert sim.frame == 40
+    assert sim.rewind(20) == midway and sim.frame == 20
+    assert sim.rewind(100) == match.state0 and sim.frame == 0
+    assert sim.step(40) == {k: match.ground_truth()[k] for k in rb.STATE}
+    with pytest.raises(ValueError):
+        sim.set_input("move", 3, [1, 1])
+
+
+def test_runtime_docstrings():
+    import doctest
+
+    from reverie import runtime
+
+    assert doctest.testmod(runtime).failed == 0
