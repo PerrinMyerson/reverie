@@ -462,3 +462,64 @@ def test_proof_with_inexactly_parsed_floats_verifies():
     proof = run.program.roundtrip(seeds)
     report = reverie.verify(proof, source=run.program)
     assert report["passed"], [k for k, ok in report["checks"].items() if not ok]
+
+
+def test_search_witness_is_minimal_and_exact():
+    import itertools
+    import math
+
+    from reverie import lab
+
+    # A Reverie program that maps a 3-digit code to a checksum (not injective).
+    program = reverie.loads("s += (a * 7) ^ (b * 3) ^ c")
+    domain = list(itertools.product(range(8), repeat=3))
+    f = lambda code: program.run(a=code[0], b=code[1], c=code[2], s=0)["s"]  # noqa: E731
+    witness = lab.SearchWitness(f, domain)
+    total_bits = 0
+    sizes = {}
+    for code in domain:
+        output, index, size = witness.encode(code)
+        assert witness.decode(output, index) == code
+        total_bits += lab.SearchWitness.bits(size)
+        sizes[output] = size
+    # H(X | f(X)) for uniform X, and the per-input index code reaches it to
+    # within one bit.
+    h = sum(size * math.log2(size) for size in sizes.values()) / len(domain)
+    assert h <= total_bits / len(domain) < h + 1
+
+
+def test_sgd_training_is_bit_exact_across_platforms():
+    """A golden fingerprint of a small Q31 training run. CI runs this on
+    Linux, macOS and Windows: integer semantics make the result identical
+    everywhere, which float training does not guarantee. Inputs come from
+    integer-only randomness so platform libm differences cannot leak in."""
+    import hashlib
+    import json
+    import random
+
+    from reverie import lab
+
+    rng = random.Random(11)
+    q = lambda bound: rng.randint(-bound, bound)  # noqa: E731
+    n, d, h, c = 16, 6, 5, 3
+    run = lab.SGDRewind(
+        images=[[q(1 << 31) for _ in range(d)] for _ in range(n)],
+        labels=[rng.randrange(c) for _ in range(n)],
+        order=[i for _ in range(3) for i in range(n)],
+        hidden=h,
+        classes=c,
+        lr=lab.to_q31(0.125),
+    )
+    weights0 = {
+        "w1": [[q(1 << 30) for _ in range(h)] for _ in range(d)],
+        "b1": [0] * h,
+        "w2": [[q(1 << 30) for _ in range(c)] for _ in range(h)],
+        "b2": [0] * c,
+    }
+    final = run.train(weights0)
+    digest = hashlib.sha256(json.dumps(run.weights(final), sort_keys=True).encode()).hexdigest()
+    assert digest == GOLDEN_SGD_DIGEST
+    assert run.weights(run.rewind(final, 0)) == weights0
+
+
+GOLDEN_SGD_DIGEST = "4b24d3e45d6c28ca1f1bfeb68963b74589bc18030bf5a51fba63c0568585c2c5"

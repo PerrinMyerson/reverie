@@ -13,10 +13,14 @@ python3 scripts/exact_unlearning_experiment.py \
 python3 scripts/reversibility_report.py \
   --json-output docs/research/reversibility-report.json \
   --markdown-output docs/research/reversibility-report.md
+python3 scripts/prompt_recovery_study.py \
+  --json-output docs/research/prompt-recovery.json \
+  --markdown-output docs/research/prompt-recovery.md
 ```
 
-Results: [exact-unlearning-results.md](exact-unlearning-results.md) and
-[reversibility-report.md](reversibility-report.md). Each script also has a
+Results: [exact-unlearning-results.md](exact-unlearning-results.md),
+[reversibility-report.md](reversibility-report.md) and
+[prompt-recovery.md](prompt-recovery.md). Each script also has a
 `--self-test` that runs in CI.
 
 ## 1. The idea: store the errors, recompute the activations
@@ -119,14 +123,20 @@ impossible.
 ## 4. Witness ledgers: where a network throws information away
 
 A reversible program's witness is exactly what an ordinary program would have
-erased, so measuring it is an exact account of information loss, layer by
-layer and unit by unit. `reverie.ledger` measures it in coded bits: zig-zag
-plus Elias-gamma per value, an achievable size and therefore an upper bound on
-what was erased. It also converts that to Landauer's minimum erasure heat.
-Information-bottleneck analyses of deterministic networks struggle because
-mutual information is infinite or ill-posed for continuous activations
-(Amjad & Geiger; Geiger's review). Quantised networks make it finite. Here it
-is also *constructive*: the witness says which unit discarded which value.
+erased: the *intermediate values* each operation overwrites. `reverie.ledger`
+measures it in coded bits (zig-zag plus Elias-gamma per value) and converts
+that to Landauer's minimum erasure heat.
+
+> **Correction (validated in §8).** An earlier version of this note called the
+> witness "an exact account of information loss." That is wrong for
+> information about the *input*. A per-operation witness is only an upper
+> bound, and it can be loose by orders of magnitude. In the language model
+> of §8, each ReLU erases about 1,100 bits per prompt, yet the hidden state
+> after the ReLU still identifies every prompt exactly: the information about
+> the prompt actually lost is **0 bits**. Other units carry what one unit
+> zeroes.
+What the ledger *does* measure exactly is how much each unit erases of its
+own pre-activation, which is a property of the unit rather than of the input.
 
 `reverie.lab.erasure_profile` runs the trained digits model through an
 inference program whose only witness is each ReLU's negative part
@@ -140,8 +150,8 @@ inference program whose only witness is each ReLU's negative part
 - **ablating the 4 units that discard the most costs nothing (94.8% → 94.8%);
   ablating the 4 that discard the least costs 20 points (→ 74.6%).**
 
-The last point echoes activation-frequency pruning, measured here as exact
-discarded information rather than a heuristic.
+The last point echoes activation-frequency pruning: units that erase most of
+their pre-activations contribute least.
 
 **Negative result.** We expected a sample's witness size to work as a
 difficulty score, like EL2N or GraNd (Paul et al. 2021). It does not: the
@@ -192,7 +202,104 @@ The Jana benchmark times whole processes, so it mostly measures startup.
   (here `1.6744927793036237`) failed verification. It now compares the
   normalized forms the fingerprints already use. This affected the CLI too.
 
-## 7. Next experiments worth running
+## 8. Can you get the prompt back from the answer?
+
+`scripts/prompt_recovery_study.py` answers this exactly for a small language
+model ([prompt-recovery.md](prompt-recovery.md)). The model is a Bengio-style
+neural n-gram LM: embed the last 5 characters, one ReLU layer, softmax
+readout. It runs over an 8-character alphabet in fixed point, at 1.01
+bits/char held out. All 8⁵ = 32,768 prompts are enumerated, so each number is
+an exact count, not an estimate. The reported quantity is H(prompt |
+observable): the bits still missing after seeing the observable, which is
+also the smallest witness that recovers the prompt.
+
+| observable (16-bit fixed point) | missing bits, random prompt (of 15.0) | missing bits, natural prompt (of 7.4) |
+|---|---:|---:|
+| hidden state, or the 8 logits | **0** (every prompt unique) | **0** |
+| greedy answer, 1 token | 12.6 | 4.8 |
+| greedy answer, 4 tokens | 9.9 | 3.3 |
+| greedy answer, 12 tokens | 9.9 | 3.3 |
+
+What this validates:
+
+1. **From the answer alone, no.** A greedy answer reveals about 5 of a random
+   prompt's 15 bits, and about 4 of a natural prompt's 7.4, and then stops:
+   tokens 5–12 add nothing, because greedy decoding falls into a fixed
+   continuation. The 32,768 prompts produce only 89 distinct 12-token
+   answers. This is a hard ceiling that no inversion method can beat on this
+   model, and it explains why answer-only methods such as output2prompt need
+   many *different* queries, as the bits-per-query analysis of Kaneko &
+   Baldwin (2025) predicts.
+2. **From the internals, yes, completely.** The post-ReLU hidden state, and
+   even the 8 logits, identify every prompt. That matches the injectivity
+   result for transformers (Nikolaou et al., ICLR 2026) and the logit-leakage
+   work (Morris et al. 2024; Finlayson et al. 2024) on a model small enough to
+   check exhaustively.
+3. **Quantisation barely helps privacy.** Hidden states stay injective down to
+   3 fractional bits. At 2 bits they lose 0.002 bits, and at 1 bit only 0.09
+   bits of 15. That is consistent with the follow-up finding of only "a small
+   number of collisions" at 4-bit (2511.14808), and here it is exact.
+4. **The answer-plus-witness inversion you asked about works, at the
+   minimum.** Store the prompt's index among all prompts that give the same
+   answer: 10.4 bits per prompt for a 12-token answer, within 0.6 bits of the
+   9.9 bits of entropy. With that, answer plus witness returns the exact
+   prompt. A per-operation reversible implementation would carry about 1,100
+   bits per prompt of ReLU witness alone, roughly 100× more.
+
+**A practical audit that follows from this.** If a secret sits in a known
+slot of a prompt template (an account code, a PIN, a short key), the space
+of secrets can be enumerated even for a real LLM: one forward pass per
+candidate. That yields an exact, worst-case *anonymity set* per observable.
+In the toy model, a 2-character secret is uniquely identified 100% of the
+time from the hidden state or logits, at every precision. From a 3-token
+answer it is identified uniquely 5–8% of the time, with a mean anonymity set
+of 16–22 of 64. Canary *exposure* (Carlini et al., The Secret Sharer,
+2019) ranks candidates by perplexity to measure memorisation from training.
+This is the inference-time counterpart, and with greedy decoding it is exact
+rather than statistical.
+
+## 9. Does exact rewinding scale to LLM training? (No, not this way.)
+
+The error-factor witness stores `w` values per token per step, where `w` is
+the sum of the output widths of the layers, against `P` parameters for a
+checkpoint. So it only beats even a checkpoint per step below `P / w` tokens
+per step. In the digits experiment that break-even is 57 tokens per step,
+which is why a checkpoint every 58 steps matched it.
+
+For a LLaMA-7B-shaped model, the break-even is **4,841 tokens per step**. At
+a pretraining batch of 4M tokens the witness is **826× larger** than a full
+checkpoint. For LoRA (r = 16 on q and v) the break-even is 32 tokens per
+step. The idea fits online and small-batch learning, not LLM training.
+
+At LLM scale, Maclaurin et al.'s route is the right one. Momentum SGD can be
+reversed while storing only the bits the momentum decay destroys, about
+log₂(1/β) ≈ 0.15 bits per parameter per step at β = 0.9. That is independent
+of batch size and roughly 100× smaller than a 16-bit checkpoint. Reverie's
+`*=` handles the invertible half of a fixed-point decay (multiply by 7, say),
+and only the rescaling (divide by 8) loses information.
+
+## 10. What is actually novel and useful here
+
+After checking each idea against the literature, here is what holds up:
+
+| idea | status |
+|---|---|
+| exact checkpoint-free unlearning via the error-factor witness | **New as far as we found**, and validated bit-exact. Useful for small-batch and online models; **does not scale** to LLM batches (§9) |
+| reversible LM compression (encoder and decoder as one program) | **Not new.** Townsend & van de Meent (2022) did it in a verified reversible language |
+| exact injectivity of an LM's internals | **Not new** (Nikolaou et al. 2026); confirmed exactly here, including under quantisation |
+| exact ceiling on recovering a prompt from greedy answers, and its saturation | **New as an exact measurement**, on a toy model |
+| exact anonymity-set audit for secret prompt slots | **Useful, and to our knowledge not done this way.** It scales to real models whenever the secret space is enumerable |
+| per-operation witnesses as a measure of information loss | **Refuted** for information about the input (§4 correction) |
+| "uncompute by search": the minimal witness is the input's index in its preimage | **Known for Boolean circuits** (minimum garbage). New as a reversible-*program* construct. Prototyped as `reverie.lab.SearchWitness`; about 100× smaller than per-operation witnesses for the LM |
+| bit-exact training across platforms | Integer semantics guarantee it. A golden-fingerprint test runs on Linux, macOS and Windows CI. Float LLM pipelines need special kernels for this (batch-invariant inference; "GPU butterfly effect" in neural compression) |
+
+The most promising next step for Reverie the *language* is to make "uncompute
+by search" a real construct: `uncompute x by search over D`. The backward run
+enumerates a finite domain `D`, and the witness is an index. That lets
+non-injective functions carry the information-theoretic minimum witness
+instead of every erased intermediate.
+
+## 11. Next experiments worth running
 
 1. **Hypergradients through training.** This is the setting where the witness
    beats checkpoints. Reverse the digits run while accumulating
@@ -231,4 +338,14 @@ The Jana benchmark times whole processes, so it mostly measures startup.
 - Tkachenko, [Thermodynamic bounds on energy use in Deep Neural Networks](https://arxiv.org/html/2503.09980v3) (2025)
 - Grant et al., [Addressing divergent representations from causal interventions on neural networks](https://arxiv.org/html/2511.04638v4) (2025)
 - Paul, Ganguli & Dziugaite, Deep Learning on a Data Diet (EL2N/GraNd scores) (NeurIPS 2021)
+- Nikolaou et al., [Language Models are Injective and Hence Invertible](https://arxiv.org/abs/2510.15511) (ICLR 2026); [Transformer Injectivity & Geometric Robustness](https://arxiv.org/abs/2511.14808) (2025)
+- Morris et al., [Language Model Inversion](https://proceedings.iclr.cc/paper_files/paper/2024/file/999fcab97007ebef0cda9949550b4a9e-Paper-Conference.pdf) (ICLR 2024); Zhang, Morris & Shmatikov, [Extracting Prompts by Inverting LLM Outputs](https://aclanthology.org/2024.emnlp-main.819/) (EMNLP 2024)
+- Finlayson, Ren & Swayamdipta, [Logits of API-Protected LLMs Leak Proprietary Information](https://arxiv.org/abs/2403.09539) (COLM 2024)
+- Kaneko & Baldwin, [Bits Leaked per Query](https://arxiv.org/abs/2510.17000) (NeurIPS 2025)
+- Carlini et al., [The Secret Sharer](https://arxiv.org/abs/1802.08232) (USENIX Security 2019)
+- Townsend & van de Meent, [Verified Reversible Programming for Verified Lossless Compression](https://arxiv.org/abs/2211.09676) (2022); Townsend, Bird & Barber, [Bits Back with ANS](https://arxiv.org/abs/1901.04866) (ICLR 2019)
+- Delétang et al., [Language Modeling Is Compression](https://arxiv.org/abs/2309.10668) (ICLR 2024)
+- Zhang, Lewis & Kleijn, [On Exact Bit-level Reversible Transformers Without Changing Architecture](https://arxiv.org/abs/2407.09093) (ICML 2025)
+- He & Thinking Machines Lab, Defeating Nondeterminism in LLM Inference (2025); [LLM-42: Enabling Determinism in LLM Inference with Verified Speculation](https://arxiv.org/html/2601.17768) (2026)
+- Kim et al., [I-BERT: Integer-only BERT Quantization](https://arxiv.org/abs/2101.01321) (ICML 2021)
 - Yokoyama & Glück, [A Reversible Programming Language and its Invertible Self-Interpreter](https://dl.acm.org/doi/pdf/10.1145/1244381.1244404) (Janus)

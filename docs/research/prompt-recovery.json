@@ -1,0 +1,1535 @@
+{
+  "schema": "reverie_prompt_recovery_v1",
+  "config": {
+    "alphabet": " aeinost",
+    "window": 5,
+    "embed": 6,
+    "hidden": 48,
+    "train_steps": 4000,
+    "answer_tokens": 12,
+    "seed": 3,
+    "prompts": 32768
+  },
+  "model_bits_per_char": 1.0086433746555898,
+  "prompt_entropy_uniform_bits": 15.0,
+  "prompt_entropy_natural_bits": 7.425251825928987,
+  "by_precision": [
+    {
+      "fraction_bits": 16,
+      "pre_activation": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "hidden_state": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "logits": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "answer": {
+        "1": {
+          "classes": 7,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 12.638827290529816,
+          "H_natural_bits": 4.821275158258118,
+          "index_code_bits": 12.947418212890625,
+          "worst_class": 14342,
+          "smallest_class": 1381
+        },
+        "2": {
+          "classes": 34,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 10.638758543422366,
+          "H_natural_bits": 3.814464324592035,
+          "index_code_bits": 11.2333984375,
+          "worst_class": 4132,
+          "smallest_class": 7
+        },
+        "3": {
+          "classes": 71,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 10.147424960445996,
+          "H_natural_bits": 3.4752675215625213,
+          "index_code_bits": 10.681732177734375,
+          "worst_class": 3791,
+          "smallest_class": 2
+        },
+        "4": {
+          "classes": 85,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.941785317128993,
+          "H_natural_bits": 3.3136161322885602,
+          "index_code_bits": 10.469482421875,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "5": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.88374914471332,
+          "H_natural_bits": 3.308157649087521,
+          "index_code_bits": 10.4124755859375,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "6": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.88374914471332,
+          "H_natural_bits": 3.308157649087521,
+          "index_code_bits": 10.4124755859375,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "7": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.88374914471332,
+          "H_natural_bits": 3.308157649087521,
+          "index_code_bits": 10.4124755859375,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "8": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.88374914471332,
+          "H_natural_bits": 3.308157649087521,
+          "index_code_bits": 10.4124755859375,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "9": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.88374914471332,
+          "H_natural_bits": 3.308157649087521,
+          "index_code_bits": 10.4124755859375,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "10": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.88374914471332,
+          "H_natural_bits": 3.308157649087521,
+          "index_code_bits": 10.4124755859375,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "11": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.88374914471332,
+          "H_natural_bits": 3.308157649087521,
+          "index_code_bits": 10.4124755859375,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "12": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.88374914471332,
+          "H_natural_bits": 3.308157649087521,
+          "index_code_bits": 10.4124755859375,
+          "worst_class": 3690,
+          "smallest_class": 1
+        }
+      },
+      "relu_local_witness_bits_per_prompt": 1124.5286254882812,
+      "relu_global_loss_bits_per_prompt": 0.0
+    },
+    {
+      "fraction_bits": 12,
+      "pre_activation": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "hidden_state": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "logits": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "answer": {
+        "1": {
+          "classes": 7,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 12.638961303666926,
+          "H_natural_bits": 4.821275159152471,
+          "index_code_bits": 12.947540283203125,
+          "worst_class": 14343,
+          "smallest_class": 1379
+        },
+        "2": {
+          "classes": 34,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 10.639019243899646,
+          "H_natural_bits": 3.8144643345573765,
+          "index_code_bits": 11.231689453125,
+          "worst_class": 4132,
+          "smallest_class": 7
+        },
+        "3": {
+          "classes": 71,
+          "singletons_fraction": 3.0517578125e-05,
+          "H_uniform_bits": 10.147810947532616,
+          "H_natural_bits": 3.475267529425828,
+          "index_code_bits": 10.682098388671875,
+          "worst_class": 3791,
+          "smallest_class": 1
+        },
+        "4": {
+          "classes": 85,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.942164401947919,
+          "H_natural_bits": 3.313616140151826,
+          "index_code_bits": 10.469818115234375,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "5": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.884128229532246,
+          "H_natural_bits": 3.3081576569507867,
+          "index_code_bits": 10.412811279296875,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "6": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.884128229532246,
+          "H_natural_bits": 3.3081576569507867,
+          "index_code_bits": 10.412811279296875,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "7": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.884128229532246,
+          "H_natural_bits": 3.3081576569507867,
+          "index_code_bits": 10.412811279296875,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "8": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.884128229532246,
+          "H_natural_bits": 3.3081576569507867,
+          "index_code_bits": 10.412811279296875,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "9": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.884128229532246,
+          "H_natural_bits": 3.3081576569507867,
+          "index_code_bits": 10.412811279296875,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "10": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.884128229532246,
+          "H_natural_bits": 3.3081576569507867,
+          "index_code_bits": 10.412811279296875,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "11": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.884128229532246,
+          "H_natural_bits": 3.3081576569507867,
+          "index_code_bits": 10.412811279296875,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "12": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.884128229532246,
+          "H_natural_bits": 3.3081576569507867,
+          "index_code_bits": 10.412811279296875,
+          "worst_class": 3690,
+          "smallest_class": 1
+        }
+      },
+      "relu_local_witness_bits_per_prompt": 864.628662109375,
+      "relu_global_loss_bits_per_prompt": 0.0
+    },
+    {
+      "fraction_bits": 10,
+      "pre_activation": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "hidden_state": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "logits": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "answer": {
+        "1": {
+          "classes": 7,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 12.638849551962371,
+          "H_natural_bits": 4.821274941707618,
+          "index_code_bits": 12.947479248046875,
+          "worst_class": 14342,
+          "smallest_class": 1381
+        },
+        "2": {
+          "classes": 34,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 10.638674567682392,
+          "H_natural_bits": 3.8144636784793073,
+          "index_code_bits": 11.23333740234375,
+          "worst_class": 4132,
+          "smallest_class": 7
+        },
+        "3": {
+          "classes": 71,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 10.146334328592845,
+          "H_natural_bits": 3.4752668757547682,
+          "index_code_bits": 10.681243896484375,
+          "worst_class": 3791,
+          "smallest_class": 2
+        },
+        "4": {
+          "classes": 85,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.940597071069512,
+          "H_natural_bits": 3.3136154857881195,
+          "index_code_bits": 10.4688720703125,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "5": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.882622496643874,
+          "H_natural_bits": 3.30815700258728,
+          "index_code_bits": 10.41192626953125,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "6": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.882622496643874,
+          "H_natural_bits": 3.30815700258728,
+          "index_code_bits": 10.41192626953125,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "7": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.882622496643874,
+          "H_natural_bits": 3.30815700258728,
+          "index_code_bits": 10.41192626953125,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "8": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.882622496643874,
+          "H_natural_bits": 3.30815700258728,
+          "index_code_bits": 10.41192626953125,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "9": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.882622496643874,
+          "H_natural_bits": 3.30815700258728,
+          "index_code_bits": 10.41192626953125,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "10": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.882622496643874,
+          "H_natural_bits": 3.30815700258728,
+          "index_code_bits": 10.41192626953125,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "11": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.882622496643874,
+          "H_natural_bits": 3.30815700258728,
+          "index_code_bits": 10.41192626953125,
+          "worst_class": 3690,
+          "smallest_class": 1
+        },
+        "12": {
+          "classes": 89,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.882622496643874,
+          "H_natural_bits": 3.30815700258728,
+          "index_code_bits": 10.41192626953125,
+          "worst_class": 3690,
+          "smallest_class": 1
+        }
+      },
+      "relu_local_witness_bits_per_prompt": 734.9077758789062,
+      "relu_global_loss_bits_per_prompt": 0.0
+    },
+    {
+      "fraction_bits": 8,
+      "pre_activation": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "hidden_state": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "logits": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "answer": {
+        "1": {
+          "classes": 7,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 12.63873211800644,
+          "H_natural_bits": 4.821320945805564,
+          "index_code_bits": 12.947265625,
+          "worst_class": 14344,
+          "smallest_class": 1382
+        },
+        "2": {
+          "classes": 34,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 10.640203997726282,
+          "H_natural_bits": 3.814250758134572,
+          "index_code_bits": 11.23089599609375,
+          "worst_class": 4142,
+          "smallest_class": 7
+        },
+        "3": {
+          "classes": 71,
+          "singletons_fraction": 3.0517578125e-05,
+          "H_uniform_bits": 10.147029489159394,
+          "H_natural_bits": 3.475183783652478,
+          "index_code_bits": 10.687774658203125,
+          "worst_class": 3804,
+          "smallest_class": 1
+        },
+        "4": {
+          "classes": 85,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.941202563203074,
+          "H_natural_bits": 3.3135314604214186,
+          "index_code_bits": 10.4749755859375,
+          "worst_class": 3702,
+          "smallest_class": 1
+        },
+        "5": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.882999059045382,
+          "H_natural_bits": 3.3080729846281223,
+          "index_code_bits": 10.417816162109375,
+          "worst_class": 3702,
+          "smallest_class": 1
+        },
+        "6": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.882999059045382,
+          "H_natural_bits": 3.3080729846281223,
+          "index_code_bits": 10.417816162109375,
+          "worst_class": 3702,
+          "smallest_class": 1
+        },
+        "7": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.882999059045382,
+          "H_natural_bits": 3.3080729846281223,
+          "index_code_bits": 10.417816162109375,
+          "worst_class": 3702,
+          "smallest_class": 1
+        },
+        "8": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.882999059045382,
+          "H_natural_bits": 3.3080729846281223,
+          "index_code_bits": 10.417816162109375,
+          "worst_class": 3702,
+          "smallest_class": 1
+        },
+        "9": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.882999059045382,
+          "H_natural_bits": 3.3080729846281223,
+          "index_code_bits": 10.417816162109375,
+          "worst_class": 3702,
+          "smallest_class": 1
+        },
+        "10": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.882999059045382,
+          "H_natural_bits": 3.3080729846281223,
+          "index_code_bits": 10.417816162109375,
+          "worst_class": 3702,
+          "smallest_class": 1
+        },
+        "11": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.882999059045382,
+          "H_natural_bits": 3.3080729846281223,
+          "index_code_bits": 10.417816162109375,
+          "worst_class": 3702,
+          "smallest_class": 1
+        },
+        "12": {
+          "classes": 89,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.882999059045382,
+          "H_natural_bits": 3.3080729846281223,
+          "index_code_bits": 10.417816162109375,
+          "worst_class": 3702,
+          "smallest_class": 1
+        }
+      },
+      "relu_local_witness_bits_per_prompt": 605.7859497070312,
+      "relu_global_loss_bits_per_prompt": 0.0
+    },
+    {
+      "fraction_bits": 6,
+      "pre_activation": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "hidden_state": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "logits": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "answer": {
+        "1": {
+          "classes": 7,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 12.643173533183013,
+          "H_natural_bits": 4.819482237170213,
+          "index_code_bits": 12.951324462890625,
+          "worst_class": 14428,
+          "smallest_class": 1380
+        },
+        "2": {
+          "classes": 34,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 10.64103144817867,
+          "H_natural_bits": 3.824718105143149,
+          "index_code_bits": 11.23681640625,
+          "worst_class": 4189,
+          "smallest_class": 7
+        },
+        "3": {
+          "classes": 70,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 10.151655528841864,
+          "H_natural_bits": 3.48266164474133,
+          "index_code_bits": 10.672210693359375,
+          "worst_class": 3844,
+          "smallest_class": 1
+        },
+        "4": {
+          "classes": 83,
+          "singletons_fraction": 0.0001220703125,
+          "H_uniform_bits": 9.982810757121342,
+          "H_natural_bits": 3.3177049842798123,
+          "index_code_bits": 10.545074462890625,
+          "worst_class": 3737,
+          "smallest_class": 1
+        },
+        "5": {
+          "classes": 86,
+          "singletons_fraction": 0.0001220703125,
+          "H_uniform_bits": 9.930286954172978,
+          "H_natural_bits": 3.3122792780646773,
+          "index_code_bits": 10.492462158203125,
+          "worst_class": 3737,
+          "smallest_class": 1
+        },
+        "6": {
+          "classes": 86,
+          "singletons_fraction": 0.0001220703125,
+          "H_uniform_bits": 9.930286954172978,
+          "H_natural_bits": 3.3122792780646773,
+          "index_code_bits": 10.492462158203125,
+          "worst_class": 3737,
+          "smallest_class": 1
+        },
+        "7": {
+          "classes": 86,
+          "singletons_fraction": 0.0001220703125,
+          "H_uniform_bits": 9.930286954172978,
+          "H_natural_bits": 3.3122792780646773,
+          "index_code_bits": 10.492462158203125,
+          "worst_class": 3737,
+          "smallest_class": 1
+        },
+        "8": {
+          "classes": 86,
+          "singletons_fraction": 0.0001220703125,
+          "H_uniform_bits": 9.930286954172978,
+          "H_natural_bits": 3.3122792780646773,
+          "index_code_bits": 10.492462158203125,
+          "worst_class": 3737,
+          "smallest_class": 1
+        },
+        "9": {
+          "classes": 86,
+          "singletons_fraction": 0.0001220703125,
+          "H_uniform_bits": 9.930286954172978,
+          "H_natural_bits": 3.3122792780646773,
+          "index_code_bits": 10.492462158203125,
+          "worst_class": 3737,
+          "smallest_class": 1
+        },
+        "10": {
+          "classes": 86,
+          "singletons_fraction": 0.0001220703125,
+          "H_uniform_bits": 9.930286954172978,
+          "H_natural_bits": 3.3122792780646773,
+          "index_code_bits": 10.492462158203125,
+          "worst_class": 3737,
+          "smallest_class": 1
+        },
+        "11": {
+          "classes": 86,
+          "singletons_fraction": 0.0001220703125,
+          "H_uniform_bits": 9.930286954172978,
+          "H_natural_bits": 3.3122792780646773,
+          "index_code_bits": 10.492462158203125,
+          "worst_class": 3737,
+          "smallest_class": 1
+        },
+        "12": {
+          "classes": 86,
+          "singletons_fraction": 0.0001220703125,
+          "H_uniform_bits": 9.930286954172978,
+          "H_natural_bits": 3.3122792780646773,
+          "index_code_bits": 10.492462158203125,
+          "worst_class": 3737,
+          "smallest_class": 1
+        }
+      },
+      "relu_local_witness_bits_per_prompt": 477.626220703125,
+      "relu_global_loss_bits_per_prompt": 0.0
+    },
+    {
+      "fraction_bits": 5,
+      "pre_activation": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "hidden_state": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "logits": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "answer": {
+        "1": {
+          "classes": 7,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 12.637343302668743,
+          "H_natural_bits": 4.824570713151808,
+          "index_code_bits": 12.9476318359375,
+          "worst_class": 14196,
+          "smallest_class": 1303
+        },
+        "2": {
+          "classes": 34,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 10.637629663561004,
+          "H_natural_bits": 3.7841549029559225,
+          "index_code_bits": 11.2027587890625,
+          "worst_class": 4263,
+          "smallest_class": 21
+        },
+        "3": {
+          "classes": 73,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 10.135947493371596,
+          "H_natural_bits": 3.4419767879890966,
+          "index_code_bits": 10.6124267578125,
+          "worst_class": 3964,
+          "smallest_class": 1
+        },
+        "4": {
+          "classes": 88,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.875889207313982,
+          "H_natural_bits": 3.279073536513831,
+          "index_code_bits": 10.42041015625,
+          "worst_class": 3342,
+          "smallest_class": 1
+        },
+        "5": {
+          "classes": 91,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.822098776267092,
+          "H_natural_bits": 3.2736666925733195,
+          "index_code_bits": 10.365264892578125,
+          "worst_class": 3342,
+          "smallest_class": 1
+        },
+        "6": {
+          "classes": 91,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.822098776267092,
+          "H_natural_bits": 3.2736666925733195,
+          "index_code_bits": 10.365264892578125,
+          "worst_class": 3342,
+          "smallest_class": 1
+        },
+        "7": {
+          "classes": 91,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.822098776267092,
+          "H_natural_bits": 3.2736666925733195,
+          "index_code_bits": 10.365264892578125,
+          "worst_class": 3342,
+          "smallest_class": 1
+        },
+        "8": {
+          "classes": 91,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.822098776267092,
+          "H_natural_bits": 3.2736666925733195,
+          "index_code_bits": 10.365264892578125,
+          "worst_class": 3342,
+          "smallest_class": 1
+        },
+        "9": {
+          "classes": 91,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.822098776267092,
+          "H_natural_bits": 3.2736666925733195,
+          "index_code_bits": 10.365264892578125,
+          "worst_class": 3342,
+          "smallest_class": 1
+        },
+        "10": {
+          "classes": 91,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.822098776267092,
+          "H_natural_bits": 3.2736666925733195,
+          "index_code_bits": 10.365264892578125,
+          "worst_class": 3342,
+          "smallest_class": 1
+        },
+        "11": {
+          "classes": 91,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.822098776267092,
+          "H_natural_bits": 3.2736666925733195,
+          "index_code_bits": 10.365264892578125,
+          "worst_class": 3342,
+          "smallest_class": 1
+        },
+        "12": {
+          "classes": 91,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.822098776267092,
+          "H_natural_bits": 3.2736666925733195,
+          "index_code_bits": 10.365264892578125,
+          "worst_class": 3342,
+          "smallest_class": 1
+        }
+      },
+      "relu_local_witness_bits_per_prompt": 415.3365478515625,
+      "relu_global_loss_bits_per_prompt": 0.0
+    },
+    {
+      "fraction_bits": 4,
+      "pre_activation": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "hidden_state": {
+        "classes": 32767,
+        "singletons_fraction": 0.99993896484375,
+        "H_uniform_bits": 6.103515625e-05,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 6.103515625e-05,
+        "worst_class": 2,
+        "smallest_class": 1
+      },
+      "logits": {
+        "classes": 32767,
+        "singletons_fraction": 0.99993896484375,
+        "H_uniform_bits": 6.103515625e-05,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 6.103515625e-05,
+        "worst_class": 2,
+        "smallest_class": 1
+      },
+      "answer": {
+        "1": {
+          "classes": 7,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 12.610849233919932,
+          "H_natural_bits": 4.823132710404277,
+          "index_code_bits": 12.92047119140625,
+          "worst_class": 13969,
+          "smallest_class": 1426
+        },
+        "2": {
+          "classes": 34,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 10.592574753232668,
+          "H_natural_bits": 3.733709896514864,
+          "index_code_bits": 11.06634521484375,
+          "worst_class": 3803,
+          "smallest_class": 14
+        },
+        "3": {
+          "classes": 72,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 10.108956000151975,
+          "H_natural_bits": 3.449494451660437,
+          "index_code_bits": 10.671966552734375,
+          "worst_class": 3617,
+          "smallest_class": 1
+        },
+        "4": {
+          "classes": 83,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.967347710840212,
+          "H_natural_bits": 3.43652655242469,
+          "index_code_bits": 10.5662841796875,
+          "worst_class": 3334,
+          "smallest_class": 1
+        },
+        "5": {
+          "classes": 85,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.958718802816435,
+          "H_natural_bits": 3.436526337879248,
+          "index_code_bits": 10.56011962890625,
+          "worst_class": 3334,
+          "smallest_class": 1
+        },
+        "6": {
+          "classes": 85,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.958718802816435,
+          "H_natural_bits": 3.436526337879248,
+          "index_code_bits": 10.56011962890625,
+          "worst_class": 3334,
+          "smallest_class": 1
+        },
+        "7": {
+          "classes": 85,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.958718802816435,
+          "H_natural_bits": 3.436526337879248,
+          "index_code_bits": 10.56011962890625,
+          "worst_class": 3334,
+          "smallest_class": 1
+        },
+        "8": {
+          "classes": 85,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.958718802816435,
+          "H_natural_bits": 3.436526337879248,
+          "index_code_bits": 10.56011962890625,
+          "worst_class": 3334,
+          "smallest_class": 1
+        },
+        "9": {
+          "classes": 85,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.958718802816435,
+          "H_natural_bits": 3.436526337879248,
+          "index_code_bits": 10.56011962890625,
+          "worst_class": 3334,
+          "smallest_class": 1
+        },
+        "10": {
+          "classes": 85,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.958718802816435,
+          "H_natural_bits": 3.436526337879248,
+          "index_code_bits": 10.56011962890625,
+          "worst_class": 3334,
+          "smallest_class": 1
+        },
+        "11": {
+          "classes": 85,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.958718802816435,
+          "H_natural_bits": 3.436526337879248,
+          "index_code_bits": 10.56011962890625,
+          "worst_class": 3334,
+          "smallest_class": 1
+        },
+        "12": {
+          "classes": 85,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 9.958718802816435,
+          "H_natural_bits": 3.436526337879248,
+          "index_code_bits": 10.56011962890625,
+          "worst_class": 3334,
+          "smallest_class": 1
+        }
+      },
+      "relu_local_witness_bits_per_prompt": 355.7369384765625,
+      "relu_global_loss_bits_per_prompt": 6.103515625e-05
+    },
+    {
+      "fraction_bits": 3,
+      "pre_activation": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "hidden_state": {
+        "classes": 32763,
+        "singletons_fraction": 0.99969482421875,
+        "H_uniform_bits": 0.00030517578125,
+        "H_natural_bits": 1.4852445613783745e-05,
+        "index_code_bits": 0.00030517578125,
+        "worst_class": 2,
+        "smallest_class": 1
+      },
+      "logits": {
+        "classes": 32760,
+        "singletons_fraction": 0.99951171875,
+        "H_uniform_bits": 0.00048828125,
+        "H_natural_bits": 3.8660513667823634e-05,
+        "index_code_bits": 0.00048828125,
+        "worst_class": 2,
+        "smallest_class": 1
+      },
+      "answer": {
+        "1": {
+          "classes": 8,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 12.62590632639099,
+          "H_natural_bits": 4.82129547004576,
+          "index_code_bits": 12.9351806640625,
+          "worst_class": 14317,
+          "smallest_class": 2
+        },
+        "2": {
+          "classes": 40,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 10.617765486138243,
+          "H_natural_bits": 3.762783010116448,
+          "index_code_bits": 11.233123779296875,
+          "worst_class": 4249,
+          "smallest_class": 1
+        },
+        "3": {
+          "classes": 81,
+          "singletons_fraction": 9.1552734375e-05,
+          "H_uniform_bits": 10.09941439435907,
+          "H_natural_bits": 3.4270501259931017,
+          "index_code_bits": 10.625030517578125,
+          "worst_class": 3820,
+          "smallest_class": 1
+        },
+        "4": {
+          "classes": 94,
+          "singletons_fraction": 0.000152587890625,
+          "H_uniform_bits": 9.791916061721032,
+          "H_natural_bits": 3.1748271576805145,
+          "index_code_bits": 10.3671875,
+          "worst_class": 2458,
+          "smallest_class": 1
+        },
+        "5": {
+          "classes": 98,
+          "singletons_fraction": 0.00018310546875,
+          "H_uniform_bits": 9.699363287085506,
+          "H_natural_bits": 3.165842746110181,
+          "index_code_bits": 10.29095458984375,
+          "worst_class": 2458,
+          "smallest_class": 1
+        },
+        "6": {
+          "classes": 98,
+          "singletons_fraction": 0.00018310546875,
+          "H_uniform_bits": 9.699363287085506,
+          "H_natural_bits": 3.165842746110181,
+          "index_code_bits": 10.29095458984375,
+          "worst_class": 2458,
+          "smallest_class": 1
+        },
+        "7": {
+          "classes": 98,
+          "singletons_fraction": 0.00018310546875,
+          "H_uniform_bits": 9.699363287085506,
+          "H_natural_bits": 3.165842746110181,
+          "index_code_bits": 10.29095458984375,
+          "worst_class": 2458,
+          "smallest_class": 1
+        },
+        "8": {
+          "classes": 98,
+          "singletons_fraction": 0.00018310546875,
+          "H_uniform_bits": 9.699363287085506,
+          "H_natural_bits": 3.165842746110181,
+          "index_code_bits": 10.29095458984375,
+          "worst_class": 2458,
+          "smallest_class": 1
+        },
+        "9": {
+          "classes": 98,
+          "singletons_fraction": 0.00018310546875,
+          "H_uniform_bits": 9.699363287085506,
+          "H_natural_bits": 3.165842746110181,
+          "index_code_bits": 10.29095458984375,
+          "worst_class": 2458,
+          "smallest_class": 1
+        },
+        "10": {
+          "classes": 98,
+          "singletons_fraction": 0.00018310546875,
+          "H_uniform_bits": 9.699363287085506,
+          "H_natural_bits": 3.165842746110181,
+          "index_code_bits": 10.29095458984375,
+          "worst_class": 2458,
+          "smallest_class": 1
+        },
+        "11": {
+          "classes": 98,
+          "singletons_fraction": 0.00018310546875,
+          "H_uniform_bits": 9.699363287085506,
+          "H_natural_bits": 3.165842746110181,
+          "index_code_bits": 10.29095458984375,
+          "worst_class": 2458,
+          "smallest_class": 1
+        },
+        "12": {
+          "classes": 98,
+          "singletons_fraction": 0.00018310546875,
+          "H_uniform_bits": 9.699363287085506,
+          "H_natural_bits": 3.165842746110181,
+          "index_code_bits": 10.29095458984375,
+          "worst_class": 2458,
+          "smallest_class": 1
+        }
+      },
+      "relu_local_witness_bits_per_prompt": 296.12432861328125,
+      "relu_global_loss_bits_per_prompt": 0.00030517578125
+    },
+    {
+      "fraction_bits": 2,
+      "pre_activation": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "hidden_state": {
+        "classes": 32729,
+        "singletons_fraction": 0.997711181640625,
+        "H_uniform_bits": 0.002449483108718579,
+        "H_natural_bits": 0.0007107117515482016,
+        "index_code_bits": 0.0025634765625,
+        "worst_class": 3,
+        "smallest_class": 1
+      },
+      "logits": {
+        "classes": 32689,
+        "singletons_fraction": 0.99530029296875,
+        "H_uniform_bits": 0.004913926697041439,
+        "H_natural_bits": 0.0009505046138852008,
+        "index_code_bits": 0.00506591796875,
+        "worst_class": 3,
+        "smallest_class": 1
+      },
+      "answer": {
+        "1": {
+          "classes": 8,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 12.678362374961665,
+          "H_natural_bits": 4.824046649951599,
+          "index_code_bits": 12.958648681640625,
+          "worst_class": 15309,
+          "smallest_class": 22
+        },
+        "2": {
+          "classes": 40,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 10.63912926661813,
+          "H_natural_bits": 3.7705720922912107,
+          "index_code_bits": 11.170806884765625,
+          "worst_class": 4249,
+          "smallest_class": 4
+        },
+        "3": {
+          "classes": 84,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 10.154972311224883,
+          "H_natural_bits": 3.412891295123452,
+          "index_code_bits": 10.559173583984375,
+          "worst_class": 3861,
+          "smallest_class": 2
+        },
+        "4": {
+          "classes": 104,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.847571830614996,
+          "H_natural_bits": 3.3984751297679594,
+          "index_code_bits": 10.380279541015625,
+          "worst_class": 3124,
+          "smallest_class": 1
+        },
+        "5": {
+          "classes": 110,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.746491917028342,
+          "H_natural_bits": 3.389191844629244,
+          "index_code_bits": 10.31488037109375,
+          "worst_class": 2502,
+          "smallest_class": 1
+        },
+        "6": {
+          "classes": 110,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.746491917028342,
+          "H_natural_bits": 3.389191844629244,
+          "index_code_bits": 10.31488037109375,
+          "worst_class": 2502,
+          "smallest_class": 1
+        },
+        "7": {
+          "classes": 110,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.746491917028342,
+          "H_natural_bits": 3.389191844629244,
+          "index_code_bits": 10.31488037109375,
+          "worst_class": 2502,
+          "smallest_class": 1
+        },
+        "8": {
+          "classes": 110,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.746491917028342,
+          "H_natural_bits": 3.389191844629244,
+          "index_code_bits": 10.31488037109375,
+          "worst_class": 2502,
+          "smallest_class": 1
+        },
+        "9": {
+          "classes": 110,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.746491917028342,
+          "H_natural_bits": 3.389191844629244,
+          "index_code_bits": 10.31488037109375,
+          "worst_class": 2502,
+          "smallest_class": 1
+        },
+        "10": {
+          "classes": 110,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.746491917028342,
+          "H_natural_bits": 3.389191844629244,
+          "index_code_bits": 10.31488037109375,
+          "worst_class": 2502,
+          "smallest_class": 1
+        },
+        "11": {
+          "classes": 110,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.746491917028342,
+          "H_natural_bits": 3.389191844629244,
+          "index_code_bits": 10.31488037109375,
+          "worst_class": 2502,
+          "smallest_class": 1
+        },
+        "12": {
+          "classes": 110,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 9.746491917028342,
+          "H_natural_bits": 3.389191844629244,
+          "index_code_bits": 10.31488037109375,
+          "worst_class": 2502,
+          "smallest_class": 1
+        }
+      },
+      "relu_local_witness_bits_per_prompt": 234.679443359375,
+      "relu_global_loss_bits_per_prompt": 0.002449483108718579
+    },
+    {
+      "fraction_bits": 1,
+      "pre_activation": {
+        "classes": 32768,
+        "singletons_fraction": 1.0,
+        "H_uniform_bits": 0.0,
+        "H_natural_bits": 0.0,
+        "index_code_bits": 0.0,
+        "worst_class": 1,
+        "smallest_class": 1
+      },
+      "hidden_state": {
+        "classes": 31528,
+        "singletons_fraction": 0.93414306640625,
+        "H_uniform_bits": 0.08689140391074576,
+        "H_natural_bits": 0.0996000905355969,
+        "index_code_bits": 0.0936279296875,
+        "worst_class": 12,
+        "smallest_class": 1
+      },
+      "logits": {
+        "classes": 30885,
+        "singletons_fraction": 0.905059814453125,
+        "H_uniform_bits": 0.14062458496221886,
+        "H_natural_bits": 0.16204122113318,
+        "index_code_bits": 0.154388427734375,
+        "worst_class": 21,
+        "smallest_class": 1
+      },
+      "answer": {
+        "1": {
+          "classes": 8,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 12.57883845732162,
+          "H_natural_bits": 5.086418987117451,
+          "index_code_bits": 12.995269775390625,
+          "worst_class": 12202,
+          "smallest_class": 2
+        },
+        "2": {
+          "classes": 35,
+          "singletons_fraction": 0.0,
+          "H_uniform_bits": 10.864812207785786,
+          "H_natural_bits": 3.8899253877259095,
+          "index_code_bits": 11.326934814453125,
+          "worst_class": 7334,
+          "smallest_class": 2
+        },
+        "3": {
+          "classes": 76,
+          "singletons_fraction": 6.103515625e-05,
+          "H_uniform_bits": 10.185777481388026,
+          "H_natural_bits": 3.7457498527746607,
+          "index_code_bits": 10.612884521484375,
+          "worst_class": 5649,
+          "smallest_class": 1
+        },
+        "4": {
+          "classes": 98,
+          "singletons_fraction": 0.000152587890625,
+          "H_uniform_bits": 9.928442349447096,
+          "H_natural_bits": 3.570692829171485,
+          "index_code_bits": 10.343994140625,
+          "worst_class": 5649,
+          "smallest_class": 1
+        },
+        "5": {
+          "classes": 105,
+          "singletons_fraction": 0.000152587890625,
+          "H_uniform_bits": 9.824378430720369,
+          "H_natural_bits": 3.5555965971528622,
+          "index_code_bits": 10.24603271484375,
+          "worst_class": 5649,
+          "smallest_class": 1
+        },
+        "6": {
+          "classes": 105,
+          "singletons_fraction": 0.000152587890625,
+          "H_uniform_bits": 9.824378430720369,
+          "H_natural_bits": 3.5555965971528622,
+          "index_code_bits": 10.24603271484375,
+          "worst_class": 5649,
+          "smallest_class": 1
+        },
+        "7": {
+          "classes": 105,
+          "singletons_fraction": 0.000152587890625,
+          "H_uniform_bits": 9.824378430720369,
+          "H_natural_bits": 3.5555965971528622,
+          "index_code_bits": 10.24603271484375,
+          "worst_class": 5649,
+          "smallest_class": 1
+        },
+        "8": {
+          "classes": 105,
+          "singletons_fraction": 0.000152587890625,
+          "H_uniform_bits": 9.824378430720369,
+          "H_natural_bits": 3.5555965971528622,
+          "index_code_bits": 10.24603271484375,
+          "worst_class": 5649,
+          "smallest_class": 1
+        },
+        "9": {
+          "classes": 105,
+          "singletons_fraction": 0.000152587890625,
+          "H_uniform_bits": 9.824378430720369,
+          "H_natural_bits": 3.5555965971528622,
+          "index_code_bits": 10.24603271484375,
+          "worst_class": 5649,
+          "smallest_class": 1
+        },
+        "10": {
+          "classes": 105,
+          "singletons_fraction": 0.000152587890625,
+          "H_uniform_bits": 9.824378430720369,
+          "H_natural_bits": 3.5555965971528622,
+          "index_code_bits": 10.24603271484375,
+          "worst_class": 5649,
+          "smallest_class": 1
+        },
+        "11": {
+          "classes": 105,
+          "singletons_fraction": 0.000152587890625,
+          "H_uniform_bits": 9.824378430720369,
+          "H_natural_bits": 3.5555965971528622,
+          "index_code_bits": 10.24603271484375,
+          "worst_class": 5649,
+          "smallest_class": 1
+        },
+        "12": {
+          "classes": 105,
+          "singletons_fraction": 0.000152587890625,
+          "H_uniform_bits": 9.824378430720369,
+          "H_natural_bits": 3.5555965971528622,
+          "index_code_bits": 10.24603271484375,
+          "worst_class": 5649,
+          "smallest_class": 1
+        }
+      },
+      "relu_local_witness_bits_per_prompt": 199.810546875,
+      "relu_global_loss_bits_per_prompt": 0.08689140391074576
+    }
+  ],
+  "secret_slot_audit": {
+    "secrets": 64,
+    "rows": [
+      {
+        "fraction_bits": 16,
+        "hidden_state": {
+          "min_anonymity": 1,
+          "mean_anonymity": 1.0,
+          "uniquely_identified_fraction": 1.0
+        },
+        "logits": {
+          "min_anonymity": 1,
+          "mean_anonymity": 1.0,
+          "uniquely_identified_fraction": 1.0
+        },
+        "answer_3": {
+          "min_anonymity": 1,
+          "mean_anonymity": 19.25,
+          "uniquely_identified_fraction": 0.078125
+        },
+        "answer_12": {
+          "min_anonymity": 1,
+          "mean_anonymity": 19.25,
+          "uniquely_identified_fraction": 0.078125
+        }
+      },
+      {
+        "fraction_bits": 8,
+        "hidden_state": {
+          "min_anonymity": 1,
+          "mean_anonymity": 1.0,
+          "uniquely_identified_fraction": 1.0
+        },
+        "logits": {
+          "min_anonymity": 1,
+          "mean_anonymity": 1.0,
+          "uniquely_identified_fraction": 1.0
+        },
+        "answer_3": {
+          "min_anonymity": 1,
+          "mean_anonymity": 19.25,
+          "uniquely_identified_fraction": 0.078125
+        },
+        "answer_12": {
+          "min_anonymity": 1,
+          "mean_anonymity": 19.25,
+          "uniquely_identified_fraction": 0.078125
+        }
+      },
+      {
+        "fraction_bits": 4,
+        "hidden_state": {
+          "min_anonymity": 1,
+          "mean_anonymity": 1.0,
+          "uniquely_identified_fraction": 1.0
+        },
+        "logits": {
+          "min_anonymity": 1,
+          "mean_anonymity": 1.0,
+          "uniquely_identified_fraction": 1.0
+        },
+        "answer_3": {
+          "min_anonymity": 1,
+          "mean_anonymity": 19.15625,
+          "uniquely_identified_fraction": 0.0625
+        },
+        "answer_12": {
+          "min_anonymity": 1,
+          "mean_anonymity": 16.3125,
+          "uniquely_identified_fraction": 0.078125
+        }
+      },
+      {
+        "fraction_bits": 2,
+        "hidden_state": {
+          "min_anonymity": 1,
+          "mean_anonymity": 1.0,
+          "uniquely_identified_fraction": 1.0
+        },
+        "logits": {
+          "min_anonymity": 1,
+          "mean_anonymity": 1.0,
+          "uniquely_identified_fraction": 1.0
+        },
+        "answer_3": {
+          "min_anonymity": 1,
+          "mean_anonymity": 22.21875,
+          "uniquely_identified_fraction": 0.046875
+        },
+        "answer_12": {
+          "min_anonymity": 1,
+          "mean_anonymity": 17.6875,
+          "uniquely_identified_fraction": 0.046875
+        }
+      }
+    ]
+  }
+}

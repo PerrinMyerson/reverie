@@ -41,6 +41,7 @@ jobs:
         run: |
           python scripts/exact_unlearning_experiment.py --self-test
           python scripts/reversibility_report.py --self-test
+          python scripts/prompt_recovery_study.py --self-test
 
   linux:
     name: wheels (manylinux ${{ matrix.target }})

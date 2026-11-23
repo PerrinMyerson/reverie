@@ -39,6 +39,7 @@ __all__ = [
     "erasure_profile",
     "SGDRewind",
     "TrainingWitness",
+    "SearchWitness",
 ]
 
 #: 1.0 in Q31 fixed point.
@@ -209,6 +210,50 @@ def erasure_profile(
         "dead_neurons": [n["neuron"] for n in neurons if n["erased_fraction"] == 1.0],
         "linear_neurons": [n["neuron"] for n in neurons if n["erased_fraction"] == 0.0],
     }
+
+
+class SearchWitness:
+    """Minimal witnesses for a non-injective function on a finite domain.
+
+    An op-by-op reversible program keeps everything each operation erases;
+    the witness for ``f`` can be far larger than the information ``f``
+    actually destroys about its input. The information-theoretic minimum is
+    ``H(X | f(X))``. For a uniform input it is reached, to within one bit, by
+    storing only the input's *index within its preimage* ``f^-1(f(x))``.
+    Uncomputing then means searching the domain for the inputs with the same
+    output, in a fixed order.
+
+    This prototypes that "uncompute by search" for any deterministic ``f``
+    (for example a Reverie program's ``run``). Encoding costs one evaluation of
+    ``f``; decoding costs one evaluation per domain element, the price of the
+    smaller witness.
+    """
+
+    def __init__(self, f, domain) -> None:
+        self.f = f
+        self.domain = list(domain)
+        self._outputs: Optional[list] = None
+
+    def _preimage(self, output) -> list:
+        # One pass of `f` over the domain, cached: later searches are free.
+        if self._outputs is None:
+            self._outputs = [self.f(x) for x in self.domain]
+        return [x for x, y in zip(self.domain, self._outputs) if y == output]
+
+    def encode(self, x):
+        """Return ``(f(x), index, class_size)``. ``index`` needs
+        ``ceil(log2(class_size))`` bits."""
+        output = self.f(x)
+        preimage = self._preimage(output)
+        return output, preimage.index(x), len(preimage)
+
+    def decode(self, output, index):
+        """Recover the input from the output and its index witness."""
+        return self._preimage(output)[index]
+
+    @staticmethod
+    def bits(class_size: int) -> int:
+        return max(0, (class_size - 1).bit_length())
 
 
 WEIGHTS = ("w1", "b1", "w2", "b2")

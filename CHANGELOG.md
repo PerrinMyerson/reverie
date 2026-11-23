@@ -13,6 +13,12 @@
   `scripts/reversibility_report.py` and the write-up in `docs/research/`.
 - Fixed `verify-roundtrip` rejecting valid proofs whose ML profile holds a
   float that `serde_json` parses one ulp off.
+- `scripts/prompt_recovery_study.py`: exact, exhaustive measurement of how much
+  of a prompt a small LM's hidden state, logits and greedy answers reveal, a
+  secret-slot anonymity audit, and `reverie.lab.SearchWitness`
+  (uncompute-by-search minimal witnesses). The research note now corrects
+  the earlier claim that per-operation witnesses measure input information
+  loss, and adds an LLM-scale analysis of the rewind witness.
 - Faster Python store conversion (fast int/list paths, cached `Stack` type).
 - Python package: `crates/reverie-py` (PyO3, abi3 wheels for CPython 3.9+
   built with maturin) exposes `reverie.load`/`loads`, `Program.run`,
