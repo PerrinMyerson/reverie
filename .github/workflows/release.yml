@@ -1,0 +1,137 @@
+name: Release
+
+# Push a tag like `v0.2.0` (matching the version in Cargo.toml) to build and
+# publish everything. PyPI publishing uses trusted publishing: configure a
+# trusted publisher for this repository and the `release.yml` workflow in the
+# `pypi` environment on PyPI first (see docs/releasing.md).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches the crate and extension versions
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          crate=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          ext=$(python3 -c "import json;print(json.load(open('editors/vscode/package.json'))['version'])")
+          echo "tag=$tag crate=$crate extension=$ext"
+          test "$tag" = "$crate" && test "$tag" = "$ext"
+
+  wheels:
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64, manylinux: auto }
+          - { os: ubuntu-latest, target: aarch64, manylinux: auto }
+          - { os: macos-latest, target: x86_64 }
+          - { os: macos-latest, target: aarch64 }
+          - { os: windows-latest, target: x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        if: runner.os == 'Windows'
+        with:
+          python-version: "3.12"
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          manylinux: ${{ matrix.manylinux || 'off' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.target }}
+          path: dist
+
+  sdist:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist
+
+  cli:
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, name: reverie-linux-x86_64, exe: reverie }
+          - { os: macos-latest, name: reverie-macos-aarch64, exe: reverie }
+          - { os: windows-latest, name: reverie-windows-x86_64.exe, exe: reverie.exe }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release -p reverie-cli --bin reverie
+      - shell: bash
+        run: mkdir -p out && cp "target/release/${{ matrix.exe }}" "out/${{ matrix.name }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.name }}
+          path: out
+
+  vscode:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - working-directory: editors/vscode
+        run: npx --yes @vscode/vsce package --skip-license --out ../../reverie-vscode.vsix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vscode-extension
+          path: reverie-vscode.vsix
+
+  pypi:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "{wheels-*,sdist}"
+          merge-multiple: true
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [wheels, sdist, cli, vscode]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "Reverie $GITHUB_REF_NAME" --generate-notes artifacts/*

@@ -37,6 +37,9 @@ jobs:
           echo "$dir" >> "$GITHUB_PATH"
       - name: pytest
         run: python -m pytest -v
+      - name: VS Code extension diagnostics test
+        shell: bash
+        run: node editors/vscode/test/diagnostics.test.js "$PWD/target/debug/reverie"
       - name: Research script self-tests
         run: |
           python scripts/exact_unlearning_experiment.py --self-test

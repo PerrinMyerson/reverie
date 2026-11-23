@@ -10,10 +10,10 @@ use pyo3::exceptions::{PyOSError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyBool, PyDict, PyInt, PyList, PyString, PyTuple};
-use reverie_cli::embed::{self, EmbedError, ProofEngine};
+use reverie_cli::embed::{self, EmbedError, EmbedOptions, ProofEngine};
 use reverie_core::CoreError;
 use reverie_interp::{IoState, RuntimeError, State, Value};
-use reverie_syntax::{Program, SyntaxDiagnostic};
+use reverie_syntax::{ParseOptions, Program, SyntaxDiagnostic};
 
 const STRING_PATH: &str = "<string>";
 
@@ -23,7 +23,34 @@ struct PyProgram {
     program: Arc<Program>,
     source: Arc<str>,
     path: Option<String>,
-    engine: ProofEngine,
+    options: Arc<EmbedOptions>,
+}
+
+/// The full result of `Program.execute`: the store plus the I/O tapes and
+/// the lines written by `show` / `printf`.
+#[pyclass(module = "reverie", name = "Execution", frozen, get_all)]
+struct PyExecution {
+    /// The final store.
+    store: Py<PyDict>,
+    /// The input tape left after `read`s consumed from it.
+    inputs: Py<PyList>,
+    /// The output tape after `write`s appended to it.
+    outputs: Py<PyList>,
+    /// Lines produced by `show` and `printf`, in order.
+    observations: Py<PyList>,
+}
+
+#[pymethods]
+impl PyExecution {
+    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
+        Ok(format!(
+            "Execution(store={}, inputs={}, outputs={}, observations={})",
+            self.store.bind(py).repr()?,
+            self.inputs.bind(py).repr()?,
+            self.outputs.bind(py).repr()?,
+            self.observations.bind(py).repr()?
+        ))
+    }
 }
 
 /// One step of a forward execution timeline.
@@ -72,7 +99,85 @@ impl PyProgram {
     /// The execution engine: "slot" (compiled, default) or "tree".
     #[getter]
     fn engine(&self) -> &'static str {
-        engine_name(self.engine)
+        engine_name(self.options.engine)
+    }
+
+    /// Whether the program was parsed with legacy Janus rules.
+    #[getter]
+    fn legacy_janus(&self) -> bool {
+        self.options.legacy_janus
+    }
+
+    /// Explicit external type annotations, as `{name: "type"}`.
+    #[getter]
+    fn types<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let dict = PyDict::new(py);
+        for (name, ty) in &self.options.types {
+            dict.set_item(name, reverie_syntax::format_type_expr(&ty.node))?;
+        }
+        Ok(dict)
+    }
+
+    /// Run with explicit I/O tapes and return an `Execution` (store, tapes
+    /// and `show`/`printf` output). `backward=True` runs the inverse.
+    #[pyo3(signature = (store = None, /, *, inputs = None, outputs = None, backward = false))]
+    fn execute(
+        &self,
+        py: Python<'_>,
+        store: Option<&Bound<'_, PyAny>>,
+        inputs: Option<&Bound<'_, PyAny>>,
+        outputs: Option<&Bound<'_, PyAny>>,
+        backward: bool,
+    ) -> PyResult<PyExecution> {
+        let seeds = self.checked_seeds(py, store, None)?;
+        let inputs = tape_from_py(inputs, "inputs")?;
+        let outputs = tape_from_py(outputs, "outputs")?;
+        let direction = if backward {
+            Direction::Backward
+        } else {
+            Direction::Forward
+        };
+        let io = self.run_io(py, seeds, inputs, outputs, direction)?;
+        let tape = |values: &mut dyn Iterator<Item = &Value>| -> PyResult<Py<PyList>> {
+            let list = PyList::empty(py);
+            for value in values {
+                list.append(value_to_py(py, value)?)?;
+            }
+            Ok(list.unbind())
+        };
+        Ok(PyExecution {
+            store: store_to_py(py, io.store())?.unbind(),
+            inputs: tape(&mut io.input().iter())?,
+            outputs: tape(&mut io.output().iter())?,
+            observations: PyList::new(py, io.observations())?.unbind(),
+        })
+    }
+
+    /// The inverse program as a `Program` of its own: running it forward is
+    /// running this program backward.
+    fn inverse(&self) -> PyProgram {
+        let inverse = reverie_core::invert_program(&self.program);
+        let source = reverie_syntax::format_program(&inverse);
+        PyProgram {
+            program: Arc::new(inverse),
+            source: Arc::from(source),
+            path: None,
+            options: Arc::clone(&self.options),
+        }
+    }
+
+    /// The `reverie explain --json` report as a dict: external and declared
+    /// variables, features, witness metrics and run templates. `ml=True` adds
+    /// the ML profile.
+    #[pyo3(signature = (*, ml = false))]
+    fn explain(&self, py: Python<'_>, ml: bool) -> PyResult<Py<PyAny>> {
+        let text = embed::explain_json(
+            Path::new(self.display_path()),
+            &self.program,
+            &self.options,
+            ml,
+        );
+        json_loads(py, &text)
     }
 
     /// Run forward from `store` (a mapping, keyword arguments, or both) and
@@ -84,7 +189,7 @@ impl PyProgram {
         store: Option<&Bound<'_, PyAny>>,
         vars: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Py<PyDict>> {
-        self.execute(py, store, vars, Direction::Forward)
+        self.execute_store(py, store, vars, Direction::Forward)
     }
 
     /// Run backward (the inverse program) from `store` and return the
@@ -96,7 +201,7 @@ impl PyProgram {
         store: Option<&Bound<'_, PyAny>>,
         vars: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Py<PyDict>> {
-        self.execute(py, store, vars, Direction::Backward)
+        self.execute_store(py, store, vars, Direction::Backward)
     }
 
     /// Run forward then backward and return the `reverie_roundtrip_proof_v1`
@@ -112,10 +217,10 @@ impl PyProgram {
         let program = Arc::clone(&self.program);
         let source = Arc::clone(&self.source);
         let path = self.path.clone().unwrap_or_else(|| STRING_PATH.to_owned());
-        let engine = self.engine;
+        let options = Arc::clone(&self.options);
         let proof = py
             .detach(move || {
-                embed::roundtrip_proof(Path::new(&path), &source, &program, &seeds, engine)
+                embed::roundtrip_proof(Path::new(&path), &source, &program, &seeds, &options)
                     .map(|proof| proof.to_string())
             })
             .map_err(|error| self.embed_error(py, error))?;
@@ -133,8 +238,15 @@ impl PyProgram {
     ) -> PyResult<Py<PyList>> {
         let seeds = self.checked_seeds(py, store, vars)?;
         let program = Arc::clone(&self.program);
+        let execution = self.options.execution();
         let timeline = py
-            .detach(move || reverie_interp::build_timeline(&program, state_from_seeds(seeds)))
+            .detach(move || {
+                reverie_interp::build_timeline_io_with_options(
+                    &program,
+                    IoState::new(state_from_seeds(seeds), []),
+                    execution,
+                )
+            })
             .map_err(|error| self.runtime_error(py, &error))?;
         let frames = PyList::empty(py);
         for frame in timeline.frames() {
@@ -189,7 +301,7 @@ impl PyProgram {
         self.path.as_deref().unwrap_or(STRING_PATH)
     }
 
-    fn execute(
+    fn execute_store(
         &self,
         py: Python<'_>,
         store: Option<&Bound<'_, PyAny>>,
@@ -197,32 +309,39 @@ impl PyProgram {
         direction: Direction,
     ) -> PyResult<Py<PyDict>> {
         let seeds = self.checked_seeds(py, store, vars)?;
+        let io = self.run_io(py, seeds, Vec::new(), Vec::new(), direction)?;
+        Ok(store_to_py(py, io.store())?.unbind())
+    }
+
+    fn run_io(
+        &self,
+        py: Python<'_>,
+        seeds: Vec<(String, Value)>,
+        inputs: Vec<Value>,
+        outputs: Vec<Value>,
+        direction: Direction,
+    ) -> PyResult<IoState> {
         let program = Arc::clone(&self.program);
-        let engine = self.engine;
-        let result = py
-            .detach(move || {
-                let state = state_from_seeds(seeds);
-                let io = IoState::new(state, []);
-                let options = reverie_interp::ExecutionOptions::default();
-                match (engine, direction) {
-                    (ProofEngine::Tree, Direction::Forward) => {
-                        reverie_interp::execute_io_with_options(&program, io, options)
-                    }
-                    (ProofEngine::Tree, Direction::Backward) => {
-                        reverie_interp::execute_io_backward_with_options(&program, io, options)
-                    }
-                    (ProofEngine::Slot, Direction::Forward) => {
-                        reverie_interp::execute_compiled_io_with_options(&program, io, options)
-                    }
-                    (ProofEngine::Slot, Direction::Backward) => {
-                        reverie_interp::execute_compiled_io_backward_with_options(
-                            &program, io, options,
-                        )
-                    }
+        let engine = self.options.engine;
+        let options = self.options.execution();
+        py.detach(move || {
+            let io = IoState::with_output(state_from_seeds(seeds), inputs, outputs);
+            match (engine, direction) {
+                (ProofEngine::Tree, Direction::Forward) => {
+                    reverie_interp::execute_io_with_options(&program, io, options)
                 }
-            })
-            .map_err(|error| self.runtime_error(py, &error))?;
-        Ok(store_to_py(py, result.store())?.unbind())
+                (ProofEngine::Tree, Direction::Backward) => {
+                    reverie_interp::execute_io_backward_with_options(&program, io, options)
+                }
+                (ProofEngine::Slot, Direction::Forward) => {
+                    reverie_interp::execute_compiled_io_with_options(&program, io, options)
+                }
+                (ProofEngine::Slot, Direction::Backward) => {
+                    reverie_interp::execute_compiled_io_backward_with_options(&program, io, options)
+                }
+            }
+        })
+        .map_err(|error| self.runtime_error(py, &error))
     }
 
     /// Convert and validate seeds, then re-check the program against the
@@ -234,10 +353,14 @@ impl PyProgram {
         vars: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Vec<(String, Value)>> {
         let seeds = seeds_from_py(store, vars)?;
-        let types = embed::seed_types(&self.program, &seeds)
+        let types = embed::seed_types(&self.program, &seeds, &self.options)
             .map_err(|error| self.embed_error(py, error))?;
-        reverie_core::check_program_with_types(&self.program, types)
-            .map_err(|error| check_error(py, self.display_path(), &self.source, &error))?;
+        reverie_core::check_program_with_types_and_options(
+            &self.program,
+            types,
+            self.options.check(),
+        )
+        .map_err(|error| check_error(py, self.display_path(), &self.source, &error))?;
         Ok(seeds)
     }
 
@@ -306,41 +429,98 @@ fn compile(
     py: Python<'_>,
     source: String,
     path: Option<String>,
-    engine: ProofEngine,
+    options: EmbedOptions,
 ) -> PyResult<PyProgram> {
     let display = path.clone().unwrap_or_else(|| STRING_PATH.to_owned());
-    let program = match reverie_syntax::parse_program(&source) {
+    let parse_options = ParseOptions {
+        legacy_janus: options.legacy_janus,
+    };
+    let program = match reverie_syntax::parse_program_with_options(&source, parse_options) {
         Ok(program) => program,
         Err(diagnostics) => return Err(parse_error(py, &display, &source, &diagnostics)),
     };
-    reverie_core::check_program(&program)
-        .map_err(|error| check_error(py, &display, &source, &error))?;
+    reverie_core::check_program_with_types_and_options(
+        &program,
+        options.types.clone(),
+        options.check(),
+    )
+    .map_err(|error| check_error(py, &display, &source, &error))?;
     Ok(PyProgram {
         program: Arc::new(program),
         source: Arc::from(source),
         path,
-        engine,
+        options: Arc::new(options),
+    })
+}
+
+fn options_from_py(
+    py: Python<'_>,
+    engine: &str,
+    types: Option<&Bound<'_, PyAny>>,
+    legacy_janus: bool,
+) -> PyResult<EmbedOptions> {
+    let mut parsed = Vec::new();
+    if let Some(types) = types.filter(|types| !types.is_none()) {
+        let dict = PyDict::new(py);
+        dict.call_method1("update", (types,))?;
+        for (name, ty) in dict.iter() {
+            let name: String = name.extract()?;
+            let text: String = ty.extract()?;
+            let ty = reverie_syntax::parse_type_expr(&text).map_err(|diagnostics| {
+                parse_error(py, &format!("<type of {name}>"), &text, &diagnostics)
+            })?;
+            let name = if legacy_janus {
+                name.to_ascii_lowercase()
+            } else {
+                name
+            };
+            parsed.push((name, ty));
+        }
+    }
+    Ok(EmbedOptions {
+        engine: parse_engine(engine)?,
+        legacy_janus,
+        types: parsed,
     })
 }
 
 /// Parse and check the Reverie program in the file at `path`.
 #[pyfunction]
-#[pyo3(signature = (path, *, engine = "slot"))]
-fn load(py: Python<'_>, path: &Bound<'_, PyAny>, engine: &str) -> PyResult<PyProgram> {
-    let engine = parse_engine(engine)?;
+#[pyo3(signature = (path, *, engine = "slot", types = None, legacy_janus = false))]
+fn load(
+    py: Python<'_>,
+    path: &Bound<'_, PyAny>,
+    engine: &str,
+    types: Option<&Bound<'_, PyAny>>,
+    legacy_janus: bool,
+) -> PyResult<PyProgram> {
+    let options = options_from_py(py, engine, types, legacy_janus)?;
     let fspath = py.import("os")?.getattr("fspath")?.call1((path,))?;
     let path: String = fspath.extract()?;
     let source = std::fs::read_to_string(&path)
         .map_err(|error| PyOSError::new_err(format!("failed to read `{path}`: {error}")))?;
-    compile(py, source, Some(path), engine)
+    compile(py, source, Some(path), options)
 }
 
 /// Parse and check Reverie source text.
 #[pyfunction]
-#[pyo3(signature = (source, *, engine = "slot"))]
-fn loads(py: Python<'_>, source: String, engine: &str) -> PyResult<PyProgram> {
-    let engine = parse_engine(engine)?;
-    compile(py, source, None, engine)
+#[pyo3(signature = (source, *, engine = "slot", types = None, legacy_janus = false))]
+fn loads(
+    py: Python<'_>,
+    source: String,
+    engine: &str,
+    types: Option<&Bound<'_, PyAny>>,
+    legacy_janus: bool,
+) -> PyResult<PyProgram> {
+    let options = options_from_py(py, engine, types, legacy_janus)?;
+    compile(py, source, None, options)
+}
+
+/// Run the `reverie` command line with `argv` (argv[0] is the program name)
+/// and return its exit status, as the `reverie` console script does.
+#[pyfunction]
+fn cli(py: Python<'_>, argv: Vec<String>) -> i32 {
+    py.detach(move || embed::run_command_line(argv))
 }
 
 /// Verify a roundtrip proof the way `reverie verify-roundtrip --json` does.
@@ -383,6 +563,17 @@ fn verify(
             reverie_error(py, "ReverieError", &error.to_string(), "", "", None, &[])
         })?;
     json_loads(py, &report)
+}
+
+fn tape_from_py(tape: Option<&Bound<'_, PyAny>>, name: &str) -> PyResult<Vec<Value>> {
+    let Some(tape) = tape.filter(|tape| !tape.is_none()) else {
+        return Ok(Vec::new());
+    };
+    let mut values = Vec::new();
+    for (index, item) in tape.try_iter()?.enumerate() {
+        values.push(value_from_py(&item?, &|| format!("{name}[{index}]"))?);
+    }
+    Ok(values)
 }
 
 fn json_loads(py: Python<'_>, text: &str) -> PyResult<Py<PyAny>> {
@@ -693,6 +884,8 @@ fn line_column(source: &str, offset: usize) -> (usize, usize) {
 fn _reverie(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyProgram>()?;
     m.add_class::<PyFrame>()?;
+    m.add_class::<PyExecution>()?;
+    m.add_function(wrap_pyfunction!(cli, m)?)?;
     m.add_function(wrap_pyfunction!(load, m)?)?;
     m.add_function(wrap_pyfunction!(loads, m)?)?;
     m.add_function(wrap_pyfunction!(verify, m)?)?;

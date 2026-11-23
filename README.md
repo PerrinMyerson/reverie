@@ -146,73 +146,34 @@ cargo run -p reverie-cli --bin reverie-mnist-linear -- --inspect-inference targe
 
 ## Python Package
 
-Reverie also ships as a Python package (`reverie-lang` on the build side,
-`import reverie` in code). It wraps the same parser, checker and interpreters
-as the CLI through PyO3, and builds as a single abi3 wheel for CPython 3.9+.
-
-Install from a checkout (needs a Rust toolchain):
-
 ```sh
-pip install .                     # or: pip install maturin && maturin develop
+pip install reverie-lang     # import reverie, plus the `reverie` command
 ```
-
-or grab a prebuilt wheel from the `Python` workflow's artifacts and
-`pip install reverie_lang-*.whl`.
 
 ```python
 import reverie
 
-fib = reverie.load("examples/fib.rev")          # parse + check, like `reverie check`
-fib.run(n=7, i=0, a=0, b=1)                     # {'a': 13, 'b': 21, 'i': 7, 'n': 7}
-fib.reverse(n=7, i=7, a=13, b=21)               # {'a': 0, 'b': 1, 'i': 0, 'n': 7}
-print(fib.inverse_source())                     # like `reverie invert`
-
-proof = fib.roundtrip(n=7, i=0, a=0, b=1)       # same JSON as `reverie roundtrip --proof-output`
-assert proof["passed"]
-assert reverie.verify(proof)["passed"]          # like `reverie verify-roundtrip --json`
-
-for frame in fib.timeline(n=2, i=0, a=0, b=1):  # like `reverie scrub --dump`
-    print(frame.step, frame.label, frame.store)
-
-try:
-    reverie.loads("x += x")
-except reverie.CheckError as error:
-    print(error.line, error.column)
-    print(error.rendered)                       # the CLI's diagnostic, without color
+fib = reverie.load("examples/fib.rev")
+fib.run(n=7, i=0, a=0, b=1)                 # {'a': 13, 'b': 21, 'i': 7, 'n': 7}
+fib.reverse(n=7, i=7, a=13, b=21)           # {'a': 0, 'b': 1, 'i': 0, 'n': 7}
+fib.inverse()                               # the inverse, as a Program
+fib.roundtrip(n=7, i=0, a=0, b=1)           # the CLI's fingerprinted proof
 ```
 
-- Stores go in as a mapping and/or keyword arguments (`run(store, **more)`) and
-  come back as plain dicts, so results compare with `==`.
-- Values map as `int` ↔ `int`, `bool` ↔ `bool`, arrays ↔ (nested) `list`s,
-  and stacks ↔ `reverie.Stack` (top first). Tuples and NumPy arrays/scalars are
-  accepted as inputs.
-- `load(path, engine="slot" | "tree")` picks the interpreter, like `--engine`.
-- Errors: `CheckError` (and its subclass `ParseError`), `SeedError` (also a
-  `ValueError`) for bad or missing seeds, and `ExecutionError` for runtime
-  failures; all subclass `ReverieError` and carry `message`, `rendered`,
-  `line`, `column` and `span`.
-- Execution releases the GIL, so programs can run in parallel threads.
-- Proofs from `loads()` record `<string>` as their file; verify them with
-  `reverie.verify(proof, source=program)`.
+It wraps the same checker and interpreters as the CLI. On top of that it
+adds runners for code that needs a correct undo:
 
-Two pure-Python modules build on the bindings:
+- **`reverie.runtime.Saga`:** multi-step transactions whose compensations
+  are generated, not hand-written.
+- **`reverie.runtime.Migration`:** data migrations over dicts or SQLite with
+  an exact generated down-migration.
+- **`reverie.runtime.Simulation`:** step and rewind any frame loop without
+  snapshots.
 
-- `reverie.lab`: minimal-witness SGD written in Reverie. `SGDRewind` trains a
-  ReLU MLP, rewinds it to any earlier step bit for bit without checkpoints,
-  and unlearns a sample with a result bit-identical to retraining.
-  `erasure_profile` measures what each hidden unit discards.
-- `reverie.ledger`: accounts for witness storage in coded bits and as
-  Landauer's minimum erasure heat.
-- `reverie.rollback`, `reverie.saga`, `reverie.migrate`: generated undo for
-  rollback netcode, saga compensations and data down-migrations.
-- `reverie.dna`: a DNA-storage codec whose decoder is generated, and exact
-  analysis of how much event history molecular recorders preserve.
-
-See [Rewinding learning](docs/research/README.md) for the experiments and
-results.
-
-Run the Python tests with `maturin develop && pytest` (the CLI-parity tests
-also use `target/debug/reverie` when it has been built).
+**[The Python guide](docs/python.md)** covers installation, the full API,
+patterns for writing reversible code, and runnable examples for each runner.
+The research behind them is in [docs/research](docs/research/README.md).
+Editor support for VS Code is in [editors/vscode](editors/vscode/README.md).
 
 ## Workspace
 
@@ -224,6 +185,8 @@ also use `target/debug/reverie` when it has been built).
   produces the CLI's roundtrip proofs for other front ends.
 - `crates/reverie-py`: PyO3 bindings for the `reverie` Python package
   (`pyproject.toml`, `python/reverie`).
+- `editors/vscode`: VS Code extension (highlighting, live diagnostics,
+  format, show inverse).
 - `crates/reverie-tui`: ratatui scrubber and timeline dump rendering.
 
 ## Command Catalog

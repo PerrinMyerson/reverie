@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Tooling: `pip install reverie-lang` now installs the `reverie` command
+  (also `python -m reverie`), and the CLI gains `--version` and
+  `check --json` (`reverie_check_v1` diagnostics for editors and CI).
+- Python API: `Program.execute` (I/O tapes and `show`/`printf` output),
+  `types=` and `legacy_janus=` on `load`/`loads`, `Program.inverse()` and
+  `Program.explain()`.
+- `reverie.runtime`: general `Saga` (generated compensations, resumable JSON
+  log), `Migration` (per-row logic over dicts or SQLite with exact
+  down-migrations) and `Simulation` (step and rewind frame loops).
+- The checker accepts updates reading constant offsets of the target index
+  (`xs[i + 1] += xs[i]`), and the irreversible-update diagnostic suggests a
+  witness.
+- VS Code extension in `editors/vscode`; Python guide in `docs/python.md`
+  with every example tested; release workflow and `docs/releasing.md`.
 - `x *= c` for odd integer constants: an exact, witness-free bijection on
   wrapping 64-bit integers, inverted by multiplying by `c` inverse mod 2^64.
 - Generated-program property tests covering structured control flow, locals,

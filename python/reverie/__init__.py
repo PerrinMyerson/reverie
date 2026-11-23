@@ -20,10 +20,11 @@ from ._types import (
     SeedError,
     Stack,
 )
-from ._reverie import Frame, Program, __version__, load, loads, verify
+from ._reverie import Execution, Frame, Program, __version__, load, loads, verify
 
 __all__ = [
     "CheckError",
+    "Execution",
     "ExecutionError",
     "Frame",
     "ParseError",
