@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 — 2026-11-23
 
 - Tooling: `pip install reverie-lang` now installs the `reverie` command
   (also `python -m reverie`), and the CLI gains `--version` and
