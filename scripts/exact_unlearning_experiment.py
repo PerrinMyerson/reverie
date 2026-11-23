@@ -15,8 +15,9 @@ back-propagated errors). Then it:
    model misclassifies it (the witness is an error-norm score, i.e. EL2N);
 5. builds and verifies a roundtrip proof of the whole training run.
 
-Writes JSON and Markdown results. Needs `pip install reverie-lang
-scikit-learn numpy`, or `maturin develop` from a checkout.
+Writes JSON and Markdown results. Needs the `reverie` package (`maturin
+develop` from a checkout) and scikit-learn; `--self-test` needs neither
+scikit-learn nor numpy.
 
     python3 scripts/exact_unlearning_experiment.py \
         --json-output docs/research/exact-unlearning-results.json \

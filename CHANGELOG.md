@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- `x *= c` for odd integer constants: an exact, witness-free bijection on
+  wrapping 64-bit integers, inverted by multiplying by `c` inverse mod 2^64.
+- Generated-program property tests covering structured control flow, locals,
+  cross-variable updates and `*=` across parser, checker, formatter, inverter
+  and both engines.
+- `reverie.lab` (minimal-witness SGD, exact checkpoint-free rewind and
+  unlearning, ReLU erasure profiles) and `reverie.ledger` (witness accounting),
+  with `scripts/exact_unlearning_experiment.py`,
+  `scripts/reversibility_report.py` and the write-up in `docs/research/`.
+- Fixed `verify-roundtrip` rejecting valid proofs whose ML profile holds a
+  float that `serde_json` parses one ulp off.
+- Faster Python store conversion (fast int/list paths, cached `Stack` type).
 - Python package: `crates/reverie-py` (PyO3, abi3 wheels for CPython 3.9+
   built with maturin) exposes `reverie.load`/`loads`, `Program.run`,
   `reverse`, `roundtrip`, `timeline` and `inverse_source`, plus

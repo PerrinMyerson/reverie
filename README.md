@@ -195,6 +195,18 @@ except reverie.CheckError as error:
 - Proofs from `loads()` record `<string>` as their file; verify them with
   `reverie.verify(proof, source=program)`.
 
+Two pure-Python modules build on the bindings:
+
+- `reverie.lab`: minimal-witness SGD written in Reverie. `SGDRewind` trains a
+  ReLU MLP, rewinds it to any earlier step bit for bit without checkpoints,
+  and unlearns a sample with a result bit-identical to retraining.
+  `erasure_profile` measures what each hidden unit discards.
+- `reverie.ledger`: accounts for witness storage in coded bits and as
+  Landauer's minimum erasure heat.
+
+See [Rewinding learning](docs/research/README.md) for the experiments and
+results.
+
 Run the Python tests with `maturin develop && pytest` (the CLI-parity tests
 also use `target/debug/reverie` when it has been built).
 

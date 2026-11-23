@@ -319,6 +319,20 @@ own inverse. The right-hand side must not mention the updated variable.
 Prefix or postfix `++` and `--` are syntax sugar for `+= 1` and `-= 1`; `fmt`
 prints the canonical update form.
 
+`x *= c` multiplies by an odd integer constant. Multiplication by an odd number
+is a bijection on wrapping 64-bit integers, so it loses nothing: the inverse is
+`x *= c⁻¹`, where `c⁻¹` is the inverse of `c` modulo 2^64 (for `3` that is
+`-6148914691236517205`). `reverie invert` prints that factor. The factor must
+be a constant built from literals with `+`, `-`, `*` and unary minus, and it
+must be odd: `x *= 4` would discard the top two bits and is rejected, as is
+`x *= y`. `*=` also works element-wise on int tensors, and the target keeps
+its unit.
+
+```rev
+x *= 3;
+xs *= -7
+```
+
 The left-hand side can also be an array element:
 
 ```rev

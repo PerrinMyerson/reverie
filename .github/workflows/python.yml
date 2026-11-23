@@ -37,6 +37,10 @@ jobs:
           echo "$dir" >> "$GITHUB_PATH"
       - name: pytest
         run: python -m pytest -v
+      - name: Research script self-tests
+        run: |
+          python scripts/exact_unlearning_experiment.py --self-test
+          python scripts/reversibility_report.py --self-test
 
   linux:
     name: wheels (manylinux ${{ matrix.target }})
