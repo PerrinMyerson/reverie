@@ -463,6 +463,7 @@ fn stmt_parser(
             just(Token::MinusEq).to(UpdateOp::Sub),
             just(Token::XorEq).to(UpdateOp::Xor),
             just(Token::BangEq).to(UpdateOp::Xor),
+            just(Token::StarEq).to(UpdateOp::Mul),
         ));
 
         let update = place

@@ -8,7 +8,7 @@ use reverie_syntax::{
 
 use crate::{
     ExecutionOptions, IoState, RuntimeError, State, Value, eval_tensor_builtin_values,
-    format_printf_observation, format_show_observation,
+    format_printf_observation, format_show_observation, mul_update_value,
 };
 
 #[derive(Debug, Clone)]
@@ -184,6 +184,14 @@ impl CompiledProgram {
                     UpdateOp::Xor => {
                         let rhs = eval(expr, state)?;
                         update_place_xor(target, state, rhs)
+                    }
+                    UpdateOp::Mul => {
+                        let rhs = eval(expr, state)?;
+                        let span = expr.span.clone();
+                        let current = place_value_mut(target, state)?;
+                        *current = mul_update_value(current, &rhs)
+                            .map_err(|message| RuntimeError::at(message, span))?;
+                        Ok(())
                     }
                 }
             }
@@ -2802,7 +2810,9 @@ fn update_add_sub_value_in_place(
             *current = match op {
                 UpdateOp::Add => current.wrapping_add(*rhs),
                 UpdateOp::Sub => current.wrapping_sub(*rhs),
-                UpdateOp::Xor => unreachable!("xor update handled separately"),
+                UpdateOp::Xor | UpdateOp::Mul => {
+                    unreachable!("xor/mul updates handled separately")
+                }
             };
             Ok(())
         }

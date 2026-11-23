@@ -222,6 +222,9 @@ pub enum UpdateOp {
     Add,
     Sub,
     Xor,
+    /// `x *= c` for an odd integer constant `c`: a bijection on wrapping
+    /// 64-bit integers, undone by multiplying by `c`'s inverse mod 2^64.
+    Mul,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
