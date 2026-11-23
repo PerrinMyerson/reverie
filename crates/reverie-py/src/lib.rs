@@ -8,7 +8,8 @@ use std::sync::Arc;
 use ariadne::{Config, Label, Report, ReportKind, Source};
 use pyo3::exceptions::{PyOSError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PyList, PyString, PyTuple};
+use pyo3::sync::PyOnceLock;
+use pyo3::types::{PyBool, PyDict, PyInt, PyList, PyString, PyTuple};
 use reverie_cli::embed::{self, EmbedError, ProofEngine};
 use reverie_core::CoreError;
 use reverie_interp::{IoState, RuntimeError, State, Value};
@@ -413,7 +414,7 @@ fn seeds_from_py(
             let name: String = key.extract().map_err(|_| {
                 seed_error(key.py(), format!("store keys must be strings, got {key}"))
             })?;
-            let value = value_from_py(&value, &name)?;
+            let value = value_from_py(&value, &|| name.clone())?;
             match seeds.iter_mut().find(|(existing, _)| *existing == name) {
                 Some(slot) => slot.1 = value,
                 None => seeds.push((name, value)),
@@ -423,30 +424,61 @@ fn seeds_from_py(
     Ok(seeds)
 }
 
-fn value_from_py(obj: &Bound<'_, PyAny>, context: &str) -> PyResult<Value> {
+/// Seed paths such as `xs[3]` are only rendered when an error needs them, so
+/// converting large stores does not allocate a string per element.
+type Context<'a> = &'a dyn Fn() -> String;
+
+static STACK_TYPE: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
+
+fn stack_type(py: Python<'_>) -> PyResult<&Bound<'_, PyAny>> {
+    STACK_TYPE
+        .get_or_try_init(py, || {
+            Ok::<_, PyErr>(py.import("reverie._types")?.getattr("Stack")?.unbind())
+        })
+        .map(|stack| stack.bind(py))
+}
+
+fn value_from_py(obj: &Bound<'_, PyAny>, context: Context<'_>) -> PyResult<Value> {
     let py = obj.py();
+    // Fast paths first: plain ints and lists make up almost every store.
     if obj.is_instance_of::<PyBool>() {
         return Ok(Value::Bool(obj.extract()?));
     }
-    let stack_type = py.import("reverie._types")?.getattr("Stack")?;
-    if obj.is_instance(&stack_type)? {
+    if obj.is_instance_of::<PyInt>() {
+        return obj.extract::<i64>().map(Value::Int).map_err(|_| {
+            seed_error(
+                py,
+                format!("seed `{}` is outside signed 64-bit range", context()),
+            )
+        });
+    }
+    if let Ok(list) = obj.cast::<PyList>() {
+        let mut values = Vec::with_capacity(list.len());
+        for (index, item) in list.iter().enumerate() {
+            values.push(value_from_py(&item, &|| format!("{}[{index}]", context()))?);
+        }
+        return Ok(Value::Array(values));
+    }
+    if let Ok(tuple) = obj.cast::<PyTuple>() {
+        let mut values = Vec::with_capacity(tuple.len());
+        for (index, item) in tuple.iter().enumerate() {
+            values.push(value_from_py(&item, &|| format!("{}[{index}]", context()))?);
+        }
+        return Ok(Value::Array(values));
+    }
+    if obj.is_instance(stack_type(py)?)? {
         let items = obj.getattr("items")?;
         let mut values = Vec::new();
         for (index, item) in items.try_iter()?.enumerate() {
             let item = item?;
-            values.push(int_from_py(&item, &format!("{context}.stack[{index}]"))?);
+            values.push(int_from_py(&item, &|| {
+                format!("{}.stack[{index}]", context())
+            })?);
         }
         return Ok(Value::Stack(values));
     }
-    if obj.is_instance_of::<PyList>() || obj.is_instance_of::<PyTuple>() {
-        let mut values = Vec::new();
-        for (index, item) in obj.try_iter()?.enumerate() {
-            values.push(value_from_py(&item?, &format!("{context}[{index}]"))?);
-        }
-        return Ok(Value::Array(values));
-    }
     if obj.is_instance_of::<PyString>() {
-        return Err(unsupported(obj, context));
+        return Err(unsupported(obj, &context()));
     }
     // NumPy arrays and scalars (including `np.bool_`) convert via `tolist()`.
     if obj.hasattr("tolist")? {
@@ -455,15 +487,16 @@ fn value_from_py(obj: &Bound<'_, PyAny>, context: &str) -> PyResult<Value> {
     if obj.hasattr("__index__")? {
         return Ok(Value::Int(int_from_py(obj, context)?));
     }
-    Err(unsupported(obj, context))
+    Err(unsupported(obj, &context()))
 }
 
-fn int_from_py(obj: &Bound<'_, PyAny>, context: &str) -> PyResult<i64> {
+fn int_from_py(obj: &Bound<'_, PyAny>, context: Context<'_>) -> PyResult<i64> {
     if obj.is_instance_of::<PyBool>() || !obj.hasattr("__index__")? {
         return Err(seed_error(
             obj.py(),
             format!(
-                "seed `{context}` must be an int, got {}",
+                "seed `{}` must be an int, got {}",
+                context(),
                 obj.get_type().name()?
             ),
         ));
@@ -472,7 +505,7 @@ fn int_from_py(obj: &Bound<'_, PyAny>, context: &str) -> PyResult<i64> {
     index.extract::<i64>().map_err(|_| {
         seed_error(
             obj.py(),
-            format!("seed `{context}` is outside signed 64-bit range"),
+            format!("seed `{}` is outside signed 64-bit range", context()),
         )
     })
 }
@@ -502,9 +535,7 @@ fn value_to_py<'py>(py: Python<'py>, value: &Value) -> PyResult<Bound<'py, PyAny
         }
         Value::Stack(values) => {
             let items = PyList::new(py, values)?;
-            py.import("reverie._types")?
-                .getattr("Stack")?
-                .call1((items,))?
+            stack_type(py)?.call1((items,))?
         }
     })
 }

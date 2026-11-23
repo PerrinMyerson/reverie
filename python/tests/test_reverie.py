@@ -336,3 +336,129 @@ def _json_store(store: Dict[str, Any]) -> Dict[str, Any]:
         return value
 
     return {name: convert(value) for name, value in store.items()}
+
+
+# -- lab / ledger ------------------------------------------------------------
+
+
+def _tiny_run(seed=0, n=10, d=5, h=4, c=3, epochs=2):
+    import random
+
+    from reverie import lab
+
+    rng = random.Random(seed)
+    images = [[lab.to_q31(rng.uniform(-1, 1)) for _ in range(d)] for _ in range(n)]
+    labels = [rng.randrange(c) for _ in range(n)]
+    order = [i for _ in range(epochs) for i in rng.sample(range(n), n)]
+    run = lab.SGDRewind(
+        images=images, labels=labels, order=order, hidden=h, classes=c, lr=lab.to_q31(0.1)
+    )
+    weights = {
+        "w1": [[lab.to_q31(rng.gauss(0, 0.4)) for _ in range(h)] for _ in range(d)],
+        "b1": [0] * h,
+        "w2": [[lab.to_q31(rng.gauss(0, 0.4)) for _ in range(c)] for _ in range(h)],
+        "b2": [0] * c,
+    }
+    return run, weights
+
+
+@pytest.mark.parametrize("engine", ["slot", "tree"])
+def test_sgd_rewinds_exactly_to_any_step(engine):
+    from reverie import lab
+
+    run, weights0 = _tiny_run()
+    run.program = reverie.loads(run.source, engine=engine)
+    final = run.train(weights0)
+    assert run.weights(final) != weights0
+    for step in (0, 3, run.steps - 1):
+        rewound = run.rewind(final, step)
+        replayed = run.train(weights0, stop=step - 1) if step else None
+        expected = run.weights(replayed) if replayed else weights0
+        assert run.weights(rewound) == expected
+        assert all(row == [0] * len(row) for row in rewound["err_tape"][step:])
+    assert lab.SGDRewind.witness(final)["err_tape"][0] != [0] * 3
+
+
+def test_unlearning_is_bit_identical_to_retraining():
+    run, weights0 = _tiny_run()
+    final = run.train(weights0)
+    for sample in range(run.n_samples):
+        active = [0 if index == sample else 1 for index in run.data["order"]]
+        retrained = run.train(weights0, active=active)
+        unlearned = run.unlearn(final, sample)
+        assert run.weights(unlearned) == run.weights(retrained)
+        assert run.weights(unlearned) != run.weights(final)
+
+
+def test_training_matches_plain_python_sgd():
+    """The witness bookkeeping does not change the arithmetic."""
+    run, weights0 = _tiny_run()
+    final = run.train(weights0)
+    fm = lambda a, b: (a * b) >> 31  # noqa: E731
+    w1 = [row[:] for row in weights0["w1"]]
+    b1, w2, b2 = weights0["b1"][:], [row[:] for row in weights0["w2"]], weights0["b2"][:]
+    lr = run.data["lr"]
+    for s in run.data["order"]:
+        x, y = run.data["images"][s], run.data["labels"][s]
+        pre = [sum(fm(x[i], w1[i][j]) for i in range(len(x))) + b1[j] for j in range(len(b1))]
+        act = [max(v, 0) for v in pre]
+        logits = [sum(fm(act[i], w2[i][j]) for i in range(len(act))) + b2[j] for j in range(len(b2))]
+        err = [v - ((1 << 31) if j == y else 0) for j, v in enumerate(logits)]
+        back = [sum(fm(w2[i][j], err[j]) for j in range(len(err))) for i in range(len(act))]
+        delta = [fm(back[i], (1 << 31) if pre[i] > 0 else 0) for i in range(len(act))]
+        for i in range(len(act)):
+            for j in range(len(err)):
+                w2[i][j] -= fm(fm(act[i], err[j]), lr)
+        b2 = [b - fm(e, lr) for b, e in zip(b2, err)]
+        for i in range(len(x)):
+            for j in range(len(delta)):
+                w1[i][j] -= fm(fm(x[i], delta[j]), lr)
+        b1 = [b - fm(dl, lr) for b, dl in zip(b1, delta)]
+    assert run.weights(final) == {"w1": w1, "b1": b1, "w2": w2, "b2": b2}
+
+
+def test_ledger_accounting():
+    from reverie.ledger import code_length_bits, flatten, landauer_joules, ledger
+
+    assert [code_length_bits(v) for v in (0, -1, 1, -2, 2)] == [1, 3, 3, 5, 5]
+    assert list(flatten({"a": [1, [2, True]], "s": reverie.Stack([4])})) == [1, 2, 1, 4]
+    book = ledger({"w": [0, 0, 5], "v": 1}, ["w", "v"])
+    assert book.values == 4 and book.raw_bits == 256
+    assert book.entries[0].nonzero == 1
+    assert book.coded_bits == 1 + 1 + code_length_bits(5) + code_length_bits(1)
+    assert landauer_joules(1, 300) == pytest.approx(2.87e-21, rel=1e-2)
+
+
+def test_proof_with_inexactly_parsed_floats_verifies():
+    """Regression: `verify` compared the replayed ML profile with the parsed
+    one by raw equality, and serde_json's default float parser can land one
+    ulp off (here on witness_to_state_payload_ratio = 1.6744927793036237)."""
+    import random
+
+    from reverie import lab
+
+    rng = random.Random(0)
+    n, d, h, c = 600, 64, 32, 10
+    images = [[lab.to_q31(rng.uniform(0, 1)) for _ in range(d)] for _ in range(n)]
+    order = list(range(n)) * 3
+    run = lab.SGDRewind(
+        images=images,
+        labels=[i % c for i in range(n)],
+        order=order,
+        hidden=h,
+        classes=c,
+        lr=lab.to_q31(0.03),
+    )
+    seeds = dict(run.data)
+    seeds.update(
+        w1=[[lab.to_q31(rng.gauss(0, 0.2)) for _ in range(h)] for _ in range(d)],
+        b1=[0] * h,
+        w2=[[lab.to_q31(rng.gauss(0, 0.2)) for _ in range(c)] for _ in range(h)],
+        b2=[0] * c,
+        active=[1] * len(order),
+        start=0,
+        stop=len(order) - 1,
+    )
+    proof = run.program.roundtrip(seeds)
+    report = reverie.verify(proof, source=run.program)
+    assert report["passed"], [k for k, ok in report["checks"].items() if not ok]
