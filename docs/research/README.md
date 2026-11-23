@@ -473,11 +473,10 @@ drops a column:
     correction is still needed on top.
 - **Novelty.** Verified-by-construction compression already exists (§9); we
   found no DNA-storage codec built this way.
-- **Language limit exposed.** The checker cannot prove that `dna[j + 1]` and
-  `dna[j]` are different cells, so the obvious encoder is rejected, and the
-  codec uses a mirror array that is uncomputed at the end. Teaching the
-  checker that constant-offset indices are distinct is a worthwhile
-  improvement.
+- **Language limit exposed, then fixed.** The checker could not prove that
+  `dna[j + 1]` and `dna[j]` are different cells, so the obvious encoder was
+  rejected. It now treats `e + c₁` and `e + c₂` as distinct cells whenever
+  `c₁ ≠ c₂`, and the codec is written the natural way.
 
 **How much of a cell's history its DNA can give back.**
 - **The question.** Molecular recorders write events into DNA:

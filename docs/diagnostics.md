@@ -47,7 +47,9 @@ found unit `m`
 
 When both sides of a comparison are in source, type and unit mismatches carry
 two labels: one for the expected side and one for the value that did not fit.
-Other semantic errors still use a single `semantic check failed here` label.
+An irreversible update (`x += x`) adds a second label with a hint: compute into
+another variable, or keep what the update would destroy in a witness. Other
+semantic errors still use a single `semantic check failed here` label.
 
 ## Runtime Errors
 

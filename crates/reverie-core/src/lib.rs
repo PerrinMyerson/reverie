@@ -429,12 +429,24 @@ fn check_stmt(
             if !options.allow_update_aliases
                 && expr_mentions_forbidden_update_dependency(expr, target)
             {
-                return Err(CoreError::new(
+                return Err(CoreError::with_labels(
                     format!(
                         "irreversible update: `{}` reads the value being changed",
                         display_place(target)
                     ),
                     expr.span.clone(),
+                    vec![
+                        CoreLabel::new(expr.span.clone(), "semantic check failed here"),
+                        CoreLabel::new(
+                            statement.span.clone(),
+                            format!(
+                                "hint: this would destroy the old `{}`; compute into another \
+                                 variable, or keep what is lost in a witness variable \
+                                 (`w += ...; {} -= w`)",
+                                target.name, target.name
+                            ),
+                        ),
+                    ],
                 ));
             }
 
@@ -702,9 +714,49 @@ fn constant_indices_proven_distinct(left: &[SpannedExpr], right: &[SpannedExpr])
     left.iter().zip(right).any(|(left, right)| {
         match (const_int_value(left), const_int_value(right)) {
             (Some(left), Some(right)) => left != right,
-            _ => false,
+            _ => offset_indices_proven_distinct(left, right),
         }
     })
+}
+
+/// `e + c1` and `e + c2` name different cells whenever `c1 != c2`, for any
+/// shared base expression `e` (wrapping arithmetic keeps this true). Index
+/// expressions are evaluated at the same moment within one statement, so a
+/// shared base has a single value.
+fn offset_indices_proven_distinct(left: &SpannedExpr, right: &SpannedExpr) -> bool {
+    let (left_base, left_offset) = split_constant_offset(left);
+    let (right_base, right_offset) = split_constant_offset(right);
+    left_base == right_base && left_offset != right_offset
+}
+
+/// Split an index expression into a base (as canonical source text; empty
+/// for a pure constant) and a constant offset.
+fn split_constant_offset(expr: &SpannedExpr) -> (String, i64) {
+    if let Some(value) = const_int_value(expr) {
+        return (String::new(), value);
+    }
+    if let Expr::Binary { op, left, right } = &expr.node {
+        match op {
+            BinaryOp::Add => {
+                if let Some(value) = const_int_value(right) {
+                    let (base, offset) = split_constant_offset(left);
+                    return (base, offset.wrapping_add(value));
+                }
+                if let Some(value) = const_int_value(left) {
+                    let (base, offset) = split_constant_offset(right);
+                    return (base, offset.wrapping_add(value));
+                }
+            }
+            BinaryOp::Sub => {
+                if let Some(value) = const_int_value(right) {
+                    let (base, offset) = split_constant_offset(left);
+                    return (base, offset.wrapping_sub(value));
+                }
+            }
+            _ => {}
+        }
+    }
+    (reverie_syntax::format_expr(expr), 0)
 }
 
 fn place_index_mentions(place: &Place, name: &str) -> bool {
@@ -3188,6 +3240,45 @@ mod tests {
         let error = check_program(&program).expect_err("program is irreversible");
 
         assert!(error.to_string().contains("reads the value being changed"));
+    }
+
+    #[test]
+    fn accepts_updates_reading_constant_offsets_of_the_same_index() {
+        for source in [
+            "xs[i + 1] += xs[i]",
+            "xs[i] -= xs[i - 1] + xs[i + 2]",
+            "ys[2 * j + 1] += ys[2 * j] + ys[(2 * j) + 3]",
+            "xs[i] <=> xs[i + 1]",
+        ] {
+            let program = parse_program(source).expect("program parses");
+            check_program(&program).unwrap_or_else(|error| panic!("{source}: {error}"));
+        }
+    }
+
+    #[test]
+    fn rejects_offsets_that_name_the_same_cell_or_cannot_be_compared() {
+        for source in [
+            "xs[i] += xs[i + 0]",
+            "xs[i + 1] += xs[1 + i]",
+            "xs[i] += xs[j + 1]",
+        ] {
+            let program = parse_program(source).expect("program parses");
+            let error = check_program(&program).expect_err(source);
+            assert!(error.to_string().contains("reads the value being changed"));
+        }
+    }
+
+    #[test]
+    fn irreversible_update_diagnostic_carries_a_witness_hint() {
+        let program = parse_program("x += x + 1").expect("program parses");
+        let error = check_program(&program).expect_err("program is irreversible");
+        let labels = error
+            .labels()
+            .iter()
+            .map(|label| label.message().to_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(labels[0], "semantic check failed here");
+        assert!(labels[1].contains("witness"));
     }
 
     #[test]

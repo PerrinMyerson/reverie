@@ -63,7 +63,6 @@ def codec_source(n_bytes: int) -> str:
 global data: tensor<int, {n}>;
 global trits: tensor<int, {t}>;
 global dna: tensor<int, {t + 1}>;
-global prev: tensor<int, {t + 1}>;
 global pow3: tensor<int, {TRITS_PER_BYTE}> = [{", ".join(str(3 ** k) for k in range(TRITS_PER_BYTE))}];
 
 procedure main() {{
@@ -73,18 +72,10 @@ procedure main() {{
     end;
     data[i] -= {digits}
   end;
-  // `prev` mirrors `dna` one step behind: the checker cannot prove that
-  // dna[j + 1] and dna[j] are different cells, so each base is computed from
-  // the mirror, which is uncomputed again at the end.
-  prev[0] += dna[0];
   iterate int j = 0 to {t - 1}
-    dna[j + 1] += (prev[j] + 1 + trits[j]) % 4;
-    trits[j] -= (dna[j + 1] - prev[j] + 3) % 4;
-    assert dna[j + 1] != prev[j];
-    prev[j + 1] += dna[j + 1]
-  end;
-  iterate int j = 0 to {t}
-    prev[j] -= dna[j]
+    dna[j + 1] += (dna[j] + 1 + trits[j]) % 4;
+    trits[j] -= (dna[j + 1] - dna[j] + 3) % 4;
+    assert dna[j + 1] != dna[j]
   end
 }}
 """
@@ -107,7 +98,7 @@ def encode(payload: bytes, primer: str = "A") -> str:
         "dna": [BASES.index(primer)] + [0] * (n * TRITS_PER_BYTE),
     }
     out = _codec(n).run(store)
-    assert all(v == 0 for name in ("data", "trits", "prev") for v in out[name])
+    assert all(v == 0 for name in ("data", "trits") for v in out[name])
     return "".join(BASES[b] for b in out["dna"])
 
 
@@ -120,7 +111,6 @@ def decode(strand: str) -> bytes:
     store = {
         "data": [0] * n,
         "trits": [0] * t,
-        "prev": [0] * (t + 1),
         "dna": [BASES.index(b) for b in strand],
     }
     back = _codec(n).reverse(store)
