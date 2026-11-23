@@ -19,6 +19,11 @@
   (uncompute-by-search minimal witnesses). The research note now corrects
   the earlier claim that per-operation witnesses measure input information
   loss, and adds an LLM-scale analysis of the rewind witness.
+- `reverie.rollback` (rollback netcode by reverse execution),
+  `reverie.saga` (generated saga compensations) and `reverie.migrate`
+  (generated exact data down-migrations), with
+  `scripts/rollback_netcode_benchmark.py` and
+  `scripts/saga_migration_study.py` and results in `docs/research/`.
 - Faster Python store conversion (fast int/list paths, cached `Stack` type).
 - Python package: `crates/reverie-py` (PyO3, abi3 wheels for CPython 3.9+
   built with maturin) exposes `reverie.load`/`loads`, `Program.run`,

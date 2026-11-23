@@ -16,11 +16,19 @@ python3 scripts/reversibility_report.py \
 python3 scripts/prompt_recovery_study.py \
   --json-output docs/research/prompt-recovery.json \
   --markdown-output docs/research/prompt-recovery.md
+python3 scripts/rollback_netcode_benchmark.py \
+  --json-output docs/research/rollback-netcode.json \
+  --markdown-output docs/research/rollback-netcode.md
+python3 scripts/saga_migration_study.py \
+  --json-output docs/research/sagas-and-migrations.json \
+  --markdown-output docs/research/sagas-and-migrations.md
 ```
 
 Results: [exact-unlearning-results.md](exact-unlearning-results.md),
-[reversibility-report.md](reversibility-report.md) and
-[prompt-recovery.md](prompt-recovery.md). Each script also has a
+[reversibility-report.md](reversibility-report.md),
+[prompt-recovery.md](prompt-recovery.md),
+[rollback-netcode.md](rollback-netcode.md) and
+[sagas-and-migrations.md](sagas-and-migrations.md). Each script also has a
 `--self-test` that runs in CI.
 
 ## 1. The idea: store the errors, recompute the activations
@@ -127,11 +135,11 @@ erased: the *intermediate values* each operation overwrites. `reverie.ledger`
 measures it in coded bits (zig-zag plus Elias-gamma per value) and converts
 that to Landauer's minimum erasure heat.
 
-> **Correction (validated in §8).** An earlier version of this note called the
+> **Correction (validated in §7).** An earlier version of this note called the
 > witness "an exact account of information loss." That is wrong for
 > information about the *input*. A per-operation witness is only an upper
 > bound, and it can be loose by orders of magnitude. In the language model
-> of §8, each ReLU erases about 1,100 bits per prompt, yet the hidden state
+> of §7, each ReLU erases about 1,100 bits per prompt, yet the hidden state
 > after the ReLU still identifies every prompt exactly: the information about
 > the prompt actually lost is **0 bits**. Other units carry what one unit
 > zeroes.
@@ -202,7 +210,7 @@ The Jana benchmark times whole processes, so it mostly measures startup.
   (here `1.6744927793036237`) failed verification. It now compares the
   normalized forms the fingerprints already use. This affected the CLI too.
 
-## 8. Can you get the prompt back from the answer?
+## 7. Can you get the prompt back from the answer?
 
 `scripts/prompt_recovery_study.py` answers this exactly for a small language
 model ([prompt-recovery.md](prompt-recovery.md)). The model is a Bengio-style
@@ -258,7 +266,7 @@ of 16–22 of 64. Canary *exposure* (Carlini et al., The Secret Sharer,
 This is the inference-time counterpart, and with greedy decoding it is exact
 rather than statistical.
 
-## 9. Does exact rewinding scale to LLM training? (No, not this way.)
+## 8. Does exact rewinding scale to LLM training? (No, not this way.)
 
 The error-factor witness stores `w` values per token per step, where `w` is
 the sum of the output widths of the layers, against `P` parameters for a
@@ -278,19 +286,22 @@ of batch size and roughly 100× smaller than a 16-bit checkpoint. Reverie's
 `*=` handles the invertible half of a fixed-point decay (multiply by 7, say),
 and only the rescaling (divide by 8) loses information.
 
-## 10. What is actually novel and useful here
+## 9. What is actually novel and useful here
 
 After checking each idea against the literature, here is what holds up:
 
 | idea | status |
 |---|---|
-| exact checkpoint-free unlearning via the error-factor witness | **New as far as we found**, and validated bit-exact. Useful for small-batch and online models; **does not scale** to LLM batches (§9) |
+| exact checkpoint-free unlearning via the error-factor witness | **New as far as we found**, and validated bit-exact. Useful for small-batch and online models; **does not scale** to LLM batches (§8) |
 | reversible LM compression (encoder and decoder as one program) | **Not new.** Townsend & van de Meent (2022) did it in a verified reversible language |
 | exact injectivity of an LM's internals | **Not new** (Nikolaou et al. 2026); confirmed exactly here, including under quantisation |
 | exact ceiling on recovering a prompt from greedy answers, and its saturation | **New as an exact measurement**, on a toy model |
 | exact anonymity-set audit for secret prompt slots | **Useful, and to our knowledge not done this way.** It scales to real models whenever the secret space is enumerable |
 | per-operation witnesses as a measure of information loss | **Refuted** for information about the input (§4 correction) |
 | "uncompute by search": the minimal witness is the input's index in its preimage | **Known for Boolean circuits** (minimum garbage). New as a reversible-*program* construct. Prototyped as `reverie.lab.SearchWitness`; about 100× smaller than per-operation witnesses for the LM |
+| rollback netcode by reverse execution instead of snapshots | **Not found in games** (established in discrete-event simulation). Validated: exact, 7–33× less memory, ≈2.1× compute per rewound frame (§10) |
+| generated saga compensations, exact under concurrent writers | **No prior work found** on derived compensations with guarantees. Validated: 0 silent errors vs 12% hand-written and 56% snapshot (§10) |
+| exact generated data down-migrations with flagged conflicts | **Useful**; schema tools explicitly do not revert data. Validated: 100% exact, conflicts flagged, none silent (§10) |
 | bit-exact training across platforms | Integer semantics guarantee it. A golden-fingerprint test runs on Linux, macOS and Windows CI. Float LLM pipelines need special kernels for this (batch-invariant inference; "GPU butterfly effect" in neural compression) |
 
 The most promising next step for Reverie the *language* is to make "uncompute
@@ -298,6 +309,127 @@ by search" a real construct: `uncompute x by search over D`. The backward run
 enumerates a finite domain `D`, and the witness is an index. That lets
 non-injective functions carry the information-theoretic minimum witness
 instead of every erased intermediate.
+
+## 10. Beyond ML: generated undo for games and business software
+
+The broader pattern: wherever people hand-write "undo", "rollback",
+"compensate" or "down" code, Reverie can generate it with the checker's proof
+that it is the exact inverse. Where an inverse cannot exist, the program
+must say what it keeps instead of losing it silently. Three studies, each
+measured against what practitioners do today.
+
+### Rollback netcode ([rollback-netcode.md](rollback-netcode.md))
+
+Rollback netcode (GGPO, GGRS) predicts the remote player's input and rewinds
+on a misprediction, which in every implementation means snapshotting the
+whole game state every frame. GGRS requires the snapshot functions and
+cross-platform determinism. Retrofitting rollback into Mortal Kombat X
+reportedly took about two engineer-years of serialization work.
+
+`reverie.rollback` writes a fighting game (two fighters plus N bouncing
+projectiles) as a reversible frame step and rewinds by running it backward.
+With the remote input 6 frames late:
+
+- Both strategies end **bit-identical to a ground truth** that knew every
+  input, for N = 0, 16, 64 and 256, over 39–49 rollbacks each.
+- Reverse mode also ends with exactly the ground truth's witness.
+- **Memory:** the witness is **7–33× smaller** than a snapshot in coded bits
+  per frame. On most frames almost every witness entry is zero: one entry
+  per wall clamp, bounce, health floor or cooldown tick, and only when it
+  happens.
+- **Compute:** a rewound frame costs **≈2.1×** as much (backward plus
+  forward, against forward only). For N = 256 that is 194 µs against 93 µs
+  per rewound frame.
+- **Engineering:** no snapshot or serialization code. Integer semantics give
+  the cross-platform determinism rollback requires, and the golden
+  fingerprint test checks it on Linux, macOS and Windows CI.
+
+I found no published or shipped game that rewinds by reverse execution
+rather than snapshots. Reverse computation as an alternative to state saving
+is established in parallel discrete-event simulation (Perumalla et al. 1999;
+Backstroke; ROSS), which is the closest prior art.
+
+### Saga compensations ([sagas-and-migrations.md](sagas-and-migrations.md))
+
+When a step of a multi-service transaction fails, the completed steps are
+undone by compensations. Every source we found (the 1987 sagas paper,
+Temporal, Oracle's saga guides) has developers write them by hand. In 5,000
+random checkout sagas (reserve stock, charge with a fee, award capped loyalty
+points, book shipping), other transactions write the same records in between,
+and the right answer is "keep what others committed, remove the saga's
+effect":
+
+| compensation | correct | fails loudly | silently wrong |
+|---|---:|---:|---:|
+| snapshot restore | 1,404 | 0 | 1,758 (56%) |
+| hand-written | 2,786 | 0 | 376 (12%) |
+| Reverie, capped step re-checked on the current balance | 3,080 | 82 | **0** |
+| **Reverie, step written "decide on recorded input, apply a delta"** | **3,162** | **0** | **0** |
+
+Two things make this work:
+- **Updates commute.** Reverie steps are updates (`+=`, `-=`), so a
+  generated inverse subtracts exactly what the step added. That commutes
+  with concurrent updates, whereas restoring a saved value erases them.
+- **Lossy steps must keep a witness, and the inverse re-checks it.** A step
+  that loses information (the points cap) must keep a witness, and the
+  checker rejects the obvious version. The inverse re-checks the step's
+  conditions, so when concurrent activity makes exact undo impossible it
+  fails loudly instead of corrupting a balance.
+
+Writing the step to decide on the values it recorded and apply only a delta
+makes the generated compensation exact even then. The leftover in its
+witness records exactly the concurrent drift, as an audit trail.
+
+What no compensation can fix: in 208 of the 3,162 compensated sagas, another
+transaction *read* the saga's effects (a dirty read). That is the inherent
+weakness of sagas, not of this method.
+
+### Data migrations ([sagas-and-migrations.md](sagas-and-migrations.md))
+
+Generated down-migrations (for example Prisma's) revert the schema but
+explicitly not data transformations. Academic bidirectional schema evolution
+(BiDEL/InVerDa; quasi-inverses of schema mappings) shows exact inverses often
+do not exist.
+
+A Reverie v1 → v2 migration over 5,000 rows converts USD/EUR/GBP prices to
+USD cents with rounding, collapses a 6-value status to 3, packs flags and
+drops a column:
+
+- **Exact rollback.** The generated down-migration restores 5,000 of 5,000
+  rows. A hand-written data down-migration restores 0 (1,238 ignoring the
+  dropped column), and a schema-only down-migration leaves the old columns
+  empty.
+- **Rejected without a witness.** Dropping a column or rounding without
+  keeping a witness is a compile error.
+- **Witness size.** 10.9 KiB of witness covers the conversions, status and
+  flags. Keeping the dropped column itself costs 19.7 KiB, against 50.2 KiB
+  for a full backup.
+- **Rolling back after new v2 writes.**
+  - Unedited rows come back exactly.
+  - Edited USD rows carry the edit back, and migrating up again reproduces
+    it.
+  - Every edited converted row is **flagged** by a non-zero leftover in its
+    witness columns. No row is silently inconsistent, and no unedited row is
+    flagged.
+  - The flag is conservative: about half the flagged rows would have
+    round-tripped.
+
+### The general lessons
+
+1. **Generated inverses beat hand-written ones where the inverse is easy to
+   get subtly wrong.** That covers capped or rounded steps and anything with
+   a concurrent writer.
+2. **Write steps as deltas computed from recorded inputs.** Then the
+   generated inverse is also the right *semantic* compensation under
+   concurrency.
+3. **Information that cannot come back must be named.** The checker turns
+   silent data loss into either a witness or a compile error. At run time,
+   an impossible undo becomes a loud failure or a flagged row, never a
+   silent one.
+4. **The price is compute.** Rewinding costs about as much as running
+   forward, so rollback-heavy workloads pay roughly 2× on rewound work in
+   exchange for memory, for no serialization code, and for correctness by
+   construction.
 
 ## 11. Next experiments worth running
 
@@ -347,5 +479,9 @@ instead of every erased intermediate.
 - Delétang et al., [Language Modeling Is Compression](https://arxiv.org/abs/2309.10668) (ICLR 2024)
 - Zhang, Lewis & Kleijn, [On Exact Bit-level Reversible Transformers Without Changing Architecture](https://arxiv.org/abs/2407.09093) (ICML 2025)
 - He & Thinking Machines Lab, Defeating Nondeterminism in LLM Inference (2025); [LLM-42: Enabling Determinism in LLM Inference with Verified Speculation](https://arxiv.org/html/2601.17768) (2026)
+- Garcia-Molina & Salem, Sagas (SIGMOD 1987); [Temporal: compensating actions](https://temporal.io/blog/compensating-actions-part-of-a-complete-breakfast-with-sagas); [Oracle: saga participant code](https://blogs.oracle.com/developers/post/developing-saga-participant-code-for-compensating-transactions)
+- [Prisma: generating down migrations](https://www.prisma.io/docs/orm/prisma-migrate/workflows/generating-down-migrations); Herrmann et al., [Living in Parallel Realities (BiDEL/InVerDa)](https://arxiv.org/pdf/1608.05564)
+- Perumalla, Carothers & Fujimoto, [Efficient optimistic parallel simulations using reverse computation](https://www.osti.gov/biblio/1003413) (1999); [Backstroke](https://www.scilit.net/publications/ccc28b48a48d3900145ed8d8684a0c97); Schordan et al., [reversible C++ for ROSS](https://www.osti.gov/servlets/purl/1658686)
+- [GGPO](https://en.wikipedia.org/wiki/GGPO); [GGRS setup and determinism](https://docs.rs/crate/ggrs/latest/source/docs/setup.md); [rollback netcode explainer](https://ki.infil.net/w02-netcode-p5.html); [Dynasty Feud online implementation](https://www.moddb.com/features/online-implementation-for-dynasty-feud)
 - Kim et al., [I-BERT: Integer-only BERT Quantization](https://arxiv.org/abs/2101.01321) (ICML 2021)
 - Yokoyama & Glück, [A Reversible Programming Language and its Invertible Self-Interpreter](https://dl.acm.org/doi/pdf/10.1145/1244381.1244404) (Janus)

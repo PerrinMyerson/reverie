@@ -1,0 +1,98 @@
+{
+  "schema": "reverie_sagas_migrations_v1",
+  "config": {
+    "sagas": 5000,
+    "rows": 5000,
+    "edited": 0.1,
+    "seed": 1
+  },
+  "sagas": {
+    "lossy_step_rejected_with": "irreversible update: `points` reads the value being changed",
+    "styles": {
+      "loyalty": {
+        "reverie": {
+          "correct": 3080,
+          "no_compensation": 1838,
+          "loud_failure": 82
+        },
+        "snapshot": {
+          "correct": 1404,
+          "silent_corruption": 1758,
+          "no_compensation": 1838
+        },
+        "hand": {
+          "correct": 2786,
+          "no_compensation": 1838,
+          "silent_corruption": 376
+        },
+        "dirty_read": {
+          "no": 2954,
+          "n/a": 1838,
+          "yes": 208
+        }
+      },
+      "loyalty_delta": {
+        "reverie": {
+          "correct": 3162,
+          "no_compensation": 1838
+        },
+        "snapshot": {
+          "correct": 1404,
+          "silent_corruption": 1758,
+          "no_compensation": 1838
+        },
+        "hand": {
+          "correct": 2786,
+          "no_compensation": 1838,
+          "silent_corruption": 376
+        },
+        "dirty_read": {
+          "no": 2954,
+          "n/a": 1838,
+          "yes": 208
+        }
+      }
+    }
+  },
+  "migrations": {
+    "rows": 5000,
+    "lossy_drop_rejected_with": "irreversible update: `legacy_score[...]` reads the value being changed",
+    "reverie_down_exact_rows": 5000,
+    "schema_only_lost_cells": 24145,
+    "schema_only_cells": 35000,
+    "hand_written_wrong_rows": 5000,
+    "hand_written_wrong_rows_excluding_dropped_column": 3762,
+    "witness_coded_bits_by_column": {
+      "rem": 67028,
+      "orig_currency": 12496,
+      "status_bit": 9986,
+      "archived_score": 161674
+    },
+    "witness_coded_bits": 251184,
+    "full_backup_coded_bits": 411648,
+    "after_edits": {
+      "edited_rows": 500,
+      "unedited_rows_exact": true,
+      "flagged_rows": 266,
+      "flagged_but_unedited": 0,
+      "silently_inconsistent_rows": 0,
+      "by_currency": {
+        "EUR": {
+          "edited": 148,
+          "flagged": 148,
+          "round_trip": 71
+        },
+        "USD": {
+          "edited": 234,
+          "flagged": 0,
+          "round_trip": 234
+        },
+        "GBP": {
+          "edited": 118,
+          "flagged": 118,
+          "round_trip": 44
+        }
+      }
+    }
+  }
+}

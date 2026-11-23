@@ -203,6 +203,8 @@ Two pure-Python modules build on the bindings:
   `erasure_profile` measures what each hidden unit discards.
 - `reverie.ledger`: accounts for witness storage in coded bits and as
   Landauer's minimum erasure heat.
+- `reverie.rollback`, `reverie.saga`, `reverie.migrate`: generated undo for
+  rollback netcode, saga compensations and data down-migrations.
 
 See [Rewinding learning](docs/research/README.md) for the experiments and
 results.

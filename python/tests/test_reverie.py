@@ -523,3 +523,65 @@ def test_sgd_training_is_bit_exact_across_platforms():
 
 
 GOLDEN_SGD_DIGEST = "4b24d3e45d6c28ca1f1bfeb68963b74589bc18030bf5a51fba63c0568585c2c5"
+
+
+# -- rollback netcode, sagas, migrations ---------------------------------------
+
+
+def test_rollback_netcode_matches_ground_truth_both_ways():
+    from reverie import rollback as rb
+
+    match = rb.Match(n_projectiles=3, frames=90, seed=2)
+    truth = match.ground_truth()
+    back = match.program.reverse(truth)
+    assert all(back[k] == match.state0[k] for k in rb.STATE)
+    for mode in ("snapshot", "reverse"):
+        session = rb.Rollback(match, delay=5, mode=mode)
+        out = session.play()
+        assert session.stats.rollbacks > 0
+        assert all(out[k] == truth[k] for k in rb.STATE), mode
+    # Reverse mode ends with exactly the ground truth's witness too.
+    assert all(out[k] == truth[k] for k in rb.WITNESS)
+
+
+def test_saga_compensations_are_never_silently_wrong():
+    import collections
+    import random
+
+    from reverie import saga
+
+    with pytest.raises(reverie.CheckError, match="reads the value being changed"):
+        reverie.loads(saga.LOSSY_LOYALTY_SOURCE)
+    programs = saga._programs()
+    for style in ("loyalty", "loyalty_delta"):
+        rng = random.Random(7)
+        tally = collections.Counter(
+            saga.run_trial(rng, programs, loyalty=style)["reverie"] for _ in range(400)
+        )
+        assert tally["silent_corruption"] == 0, tally
+        assert tally["correct"] > 0
+        if style == "loyalty_delta":
+            assert tally["loud_failure"] == 0, tally
+
+
+def test_migration_down_is_exact_and_flags_edited_rows():
+    import random
+
+    from reverie import migrate as mg
+
+    with pytest.raises(reverie.CheckError):
+        reverie.loads(mg.LOSSY_DROP_SOURCE)
+    rng = random.Random(3)
+    v1 = mg.random_rows(200, rng)
+    program = reverie.loads(mg.migration_source(200))
+    up = program.run(v1)
+    assert all(v == 0 for c in mg.V1 for v in up[c])
+    down = program.reverse(up)
+    assert all(down[c] == v1[c] for c in mg.V1)
+    edited = {r for r in range(200) if v1["currency"][r] != 0}
+    for r in edited:
+        up["usd"][r] += 1
+    rolled = program.reverse(up)
+    flagged = {r for r in range(200) if any(rolled[c][r] for c in mg.V2 + mg.WITNESS)}
+    assert flagged <= edited
+    assert all(rolled[c][r] == v1[c][r] for c in mg.V1 for r in range(200) if r not in edited)
