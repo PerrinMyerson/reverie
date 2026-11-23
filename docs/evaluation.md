@@ -98,6 +98,9 @@ examples/invertible_coupling.rev
 examples/triangular_residual.rev
 examples/reversible_preprocess.rev
 examples/reversible_inference_trace.rev
+examples/reversible_clamp.rev
+examples/reversible_normalize.rev
+examples/reversible_pack.rev
 examples/mnist_identify.rev
 examples/mnist_reversible_step.rev
 examples/mnist_witness_tape.rev

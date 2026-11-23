@@ -652,7 +652,8 @@ range, median, and geometric-mean speedup so one extreme workload cannot be the
 only suite-level performance signal. The same checker also
 requires the artifact to use the expected schema fields, requires parseable
 timestamp, host, source, and binary metadata, requires host CPU-count metadata,
-requires the recorded working directory to match the repository root, requires
+records the working directory the run used (without requiring it to match
+the current checkout, so committed artifacts stay valid on CI), requires
 absolute source and binary paths, verifies that nested binary metadata paths
 match the top-level artifact paths, validates binary SHA-256 digests when
 present, and can pin the expected Jana and Reverie
