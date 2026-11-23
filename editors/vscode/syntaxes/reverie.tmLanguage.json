@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Reverie",
+  "scopeName": "source.reverie",
+  "fileTypes": [
+    "rev"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#procedures"
+    },
+    {
+      "include": "#control"
+    },
+    {
+      "include": "#declarations"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#builtins"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.reverie",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.reverie",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.reverie",
+          "match": "\\\\[nrt\"\\\\0]"
+        }
+      ]
+    },
+    "control": {
+      "name": "keyword.control.reverie",
+      "match": "(?i)\\b(if|then|else|fi|from|do|loop|until|iterate|to|by|end|call|uncall|assert|assert_eq|assert_ne|skip)\\b"
+    },
+    "declarations": {
+      "name": "storage.type.reverie",
+      "match": "(?i)\\b(global|local|delocal|proc|procedure|where)\\b"
+    },
+    "types": {
+      "name": "support.type.reverie",
+      "match": "\\b(int|bool|array|stack|tensor|witness)\\b"
+    },
+    "builtins": {
+      "name": "support.function.builtin.reverie",
+      "match": "\\b(push|pop|show|printf|read|unread|write|unwrite|size|empty|top|len|argmax|argmax_eq|clamp|clamp_q31|dot|dot_q31|hadamard|hadamard_q31|matmul|matmul_q31|matvec|matvec_q31|normalize_q31|one_hot|one_hot_q31|outer|outer_q31|pack_bits|rank_of|relu|relu_mask_q31|runner_up|scale|scale_q31|sum|top2_margin|top_k_contains|top_k_indices|top_k_values|transpose|unpack_bits|vecmat|vecmat_q31)\\b"
+    },
+    "constants": {
+      "name": "constant.language.reverie",
+      "match": "(?i)\\b(true|false|nil)\\b"
+    },
+    "numbers": {
+      "name": "constant.numeric.integer.reverie",
+      "match": "\\b[0-9]+\\b"
+    },
+    "procedures": {
+      "match": "(?i)\\b(proc|procedure|call|uncall)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": {
+          "name": "keyword.control.reverie"
+        },
+        "2": {
+          "name": "entity.name.function.reverie"
+        }
+      }
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.update.reverie",
+          "match": "\\+=|-=|\\^=|\\*=|\\+\\+|--|<=>"
+        },
+        {
+          "name": "keyword.operator.reverie",
+          "match": "\\*/|==|!=|<=|>=|&&|\\|\\||<<|>>|[-+*/%<>!&|^~#\\\\]"
+        }
+      ]
+    }
+  }
+}

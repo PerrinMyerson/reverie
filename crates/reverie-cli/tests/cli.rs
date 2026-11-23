@@ -5453,6 +5453,46 @@ fn alias_rejection_example_fails_check() {
 }
 
 #[test]
+fn check_json_reports_positions_labels_and_status() {
+    let example = workspace_root().join("examples/irreversible_update.rev");
+    let output = Command::cargo_bin("reverie")
+        .expect("binary exists")
+        .args(["check", "--json"])
+        .arg(&example)
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("check JSON parses");
+    assert_eq!(report["schema"], "reverie_check_v1");
+    assert_eq!(report["ok"], false);
+    let diagnostic = &report["diagnostics"][0];
+    assert_eq!(diagnostic["phase"], "check");
+    assert_eq!(diagnostic["start"]["line"], 1);
+    assert_eq!(diagnostic["start"]["column"], 6);
+    assert!(
+        diagnostic["labels"][1]["message"]
+            .as_str()
+            .expect("hint label")
+            .contains("witness")
+    );
+
+    let ok = Command::cargo_bin("reverie")
+        .expect("binary exists")
+        .args(["check", "--json"])
+        .arg(workspace_root().join("examples/fib.rev"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let ok: serde_json::Value = serde_json::from_slice(&ok).expect("check JSON parses");
+    assert_eq!(ok["ok"], true);
+    assert_eq!(ok["diagnostics"], serde_json::json!([]));
+}
+
+#[test]
 fn irreversible_update_example_fails_check() {
     let example = workspace_root().join("examples/irreversible_update.rev");
 

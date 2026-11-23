@@ -409,7 +409,15 @@ Options:
 ```text
 --type NAME=TYPE
 --legacy-janus
+--json
 ```
+
+`--json` prints a `reverie_check_v1` document instead of rendered reports, for
+editors and CI. It holds `ok` and a list of `diagnostics`, each with a
+`phase` (`parse`, `check` or `arguments`), a `message`, 1-based `start`/`end`
+positions (`line`, `column`, byte `offset`) and secondary `labels` such as
+the checker's hints. The exit status is still non-zero when `ok` is false.
+The VS Code extension in `editors/vscode` uses it for live diagnostics.
 
 Use `--type` to annotate externally seeded variables for static type and unit
 checking:

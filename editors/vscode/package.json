@@ -1,0 +1,50 @@
+{
+  "name": "reverie-lang",
+  "displayName": "Reverie",
+  "description": "Syntax highlighting, live diagnostics, run, invert and format for the Reverie reversible programming language.",
+  "version": "0.1.0",
+  "publisher": "reverie-lang",
+  "license": "MIT OR Apache-2.0",
+  "repository": { "type": "git", "url": "https://github.com/PerrinMyerson/reverie" },
+  "engines": { "vscode": "^1.80.0" },
+  "categories": ["Programming Languages", "Linters", "Formatters"],
+  "main": "./extension.js",
+  "activationEvents": ["onLanguage:reverie"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "reverie",
+        "aliases": ["Reverie", "reverie"],
+        "extensions": [".rev"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "reverie",
+        "scopeName": "source.reverie",
+        "path": "./syntaxes/reverie.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      { "command": "reverie.invert", "title": "Reverie: Show Inverse Program" },
+      { "command": "reverie.run", "title": "Reverie: Run File" },
+      { "command": "reverie.check", "title": "Reverie: Check File" }
+    ],
+    "configuration": {
+      "title": "Reverie",
+      "properties": {
+        "reverie.path": {
+          "type": "string",
+          "default": "reverie",
+          "description": "The reverie executable (installed by `pip install reverie-lang` or `cargo install --path crates/reverie-cli`)."
+        },
+        "reverie.legacyJanus": {
+          "type": "boolean",
+          "default": false,
+          "description": "Check with legacy Janus parsing (--legacy-janus)."
+        }
+      }
+    }
+  }
+}
