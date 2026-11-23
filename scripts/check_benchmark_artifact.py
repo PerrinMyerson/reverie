@@ -558,14 +558,17 @@ def effective_gate(
     if cli_value is None:
         return artifact_value
     if artifact_value is not None:
+        # An artifact generated under a stricter gate satisfies a looser
+        # required floor; enforce whichever is stricter.
         require(
-            cli_value == artifact_value,
+            artifact_value >= cli_value,
             (
-                f"--{key.replace('_', '-')} {cli_value:.2f}x does not match "
-                f"artifact performance_gate.{key} {artifact_value:.2f}x"
+                f"artifact performance_gate.{key} {artifact_value:.2f}x is looser than "
+                f"the required --{key.replace('_', '-')} {cli_value:.2f}x"
             ),
             errors,
         )
+        return max(cli_value, artifact_value)
     return cli_value
 
 
@@ -1072,15 +1075,10 @@ def validate_metadata(
     validate_absolute_path(jana_baseline, "jana_baseline", errors)
     validate_absolute_path(reverie_binary, "reverie_binary", errors)
     validate_absolute_path(working_directory, "working_directory", errors)
-    if working_directory is not None:
-        require(
-            working_directory == str(REPO_ROOT),
-            (
-                f"working_directory `{working_directory}` does not match "
-                f"repository root `{REPO_ROOT}`"
-            ),
-            errors,
-        )
+    # working_directory records where the artifact was generated. It is not
+    # compared with this checkout's location, so committed artifacts stay
+    # valid on CI and other machines; the binary paths are still checked by
+    # suffix below and source fixtures by digest.
     validate_path_suffix(
         jana_baseline,
         "jana_baseline",

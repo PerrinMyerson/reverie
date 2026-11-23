@@ -154,7 +154,9 @@ The checker enforces the recorded `performance_gate` aggregate floors even if
 `--min-observed-speedup`, `--min-median-speedup`, and
 `--min-geomean-speedup` are not repeated on the command line. Passing explicit
 values is still useful in CI because it also verifies that the artifact was
-produced with the expected gate. CI also pins run count, warmup count, command
+produced with at least the expected gate: an artifact generated under a
+stricter gate satisfies a looser required floor, and the stricter one is
+enforced. CI also pins run count, warmup count, command
 timeout, binary path suffixes, the
 per-workload `--min-speedup` recorded in the artifact, and the
 forward/reverse/round-trip workload mix.
