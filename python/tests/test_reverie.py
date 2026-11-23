@@ -623,3 +623,58 @@ def test_dna_recorders():
     assert h == 3 and forgotten == pytest.approx(6 * math.log2(6) / 8)
     tape_states = dna.recorder_states(dna.RECORDERS["ordered tape (CRISPR array, DNA Typewriter)"], 4, 3)
     assert dna.history_entropy(tape_states)[1] == 0
+
+
+# -- extended API --------------------------------------------------------------
+
+
+def test_execute_with_tapes_matches_cli(example, examples, reverie_cli):
+    io = example("io")
+    result = io.execute({"x": 5}, inputs=[7])
+    cli = reverie_cli("run", str(examples / "io.rev"), "--var", "x=5", "--input", "7", "--json")
+    assert result.store == cli["store"]
+    assert result.inputs == cli["input"] and result.outputs == cli["output"]
+    back = io.execute(result.store, inputs=result.inputs, outputs=result.outputs, backward=True)
+    assert back.store == {"x": 5} and back.inputs == [7] and back.outputs == []
+
+
+def test_execute_reports_observations(example):
+    result = example("janus_stack_reverse").execute()
+    assert result.observations == ["s = <5, 4, 3, 2, 1]"]
+    assert "Execution(" in repr(result)
+
+
+def test_explicit_types_and_units():
+    program = reverie.loads("x += d", types={"x": "int<m>", "d": "int<m>"})
+    assert program.types == {"x": "int<m>", "d": "int<m>"}
+    assert program.run(x=1, d=2) == {"d": 2, "x": 3}
+    with pytest.raises(reverie.CheckError, match="unit mismatch"):
+        reverie.loads("x += d", types={"x": "int<m>", "d": "int<s>"})
+    with pytest.raises(reverie.SeedError, match="unknown variable"):
+        reverie.loads("x += 1", types={"y": "int"}).run(x=1)
+
+
+def test_legacy_janus_mode(example):
+    program = example("janus_root", legacy_janus=True)
+    assert program.legacy_janus
+    assert program.run() == reverie.load(program.path, legacy_janus=True).run()
+
+
+def test_inverse_program_and_explain(example):
+    fib = example("fib")
+    inverse = fib.inverse()
+    assert inverse.path is None and inverse.engine == fib.engine
+    assert inverse.run(a=13, b=21, i=7, n=7) == {"a": 0, "b": 1, "i": 0, "n": 7}
+    report = fib.explain()
+    assert {entry["name"] for entry in report["external_store"]} == {"a", "b", "i", "n"}
+    assert "ml_profile" in fib.explain(ml=True)
+
+
+def test_console_script_runs_the_cli(capfd, examples):
+    from reverie.cli import main
+
+    assert main(["check", str(examples / "fib.rev")]) == 0
+    assert "ok:" in capfd.readouterr().out
+    assert main(["check", str(examples / "irreversible_update.rev")]) == 1
+    assert "hint:" in capfd.readouterr().err
+    assert main(["--version"]) == 0

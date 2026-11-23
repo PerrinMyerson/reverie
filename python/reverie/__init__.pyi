@@ -71,6 +71,18 @@ class Frame:
     @property
     def store(self) -> _Store: ...
 
+class Execution:
+    """The full result of :meth:`Program.execute`."""
+
+    @property
+    def store(self) -> _Store: ...
+    @property
+    def inputs(self) -> List[_Value]: ...
+    @property
+    def outputs(self) -> List[_Value]: ...
+    @property
+    def observations(self) -> List[str]: ...
+
 class Program:
     """A parsed, statically checked Reverie program."""
 
@@ -80,6 +92,24 @@ class Program:
     def path(self) -> Optional[str]: ...
     @property
     def engine(self) -> str: ...
+    @property
+    def legacy_janus(self) -> bool: ...
+    @property
+    def types(self) -> Dict[str, str]: ...
+    def execute(
+        self,
+        store: Optional[_StoreInput] = None,
+        /,
+        *,
+        inputs: Optional[Iterable[Any]] = None,
+        outputs: Optional[Iterable[Any]] = None,
+        backward: bool = False,
+    ) -> Execution:
+        """Run with I/O tapes; returns store, tapes and show/printf output."""
+    def inverse(self) -> Program:
+        """The inverse program; running it forward runs this one backward."""
+    def explain(self, *, ml: bool = False) -> Dict[str, Any]:
+        """The `reverie explain --json` report."""
     def run(self, store: Optional[_StoreInput] = None, /, **vars: Any) -> _Store:
         """Run forward and return the final store."""
     def reverse(self, store: Optional[_StoreInput] = None, /, **vars: Any) -> _Store:
@@ -91,10 +121,22 @@ class Program:
     def inverse_source(self) -> str: ...
     def formatted_source(self) -> str: ...
 
-def load(path: _PathLike, *, engine: str = "slot") -> Program:
+def load(
+    path: _PathLike,
+    *,
+    engine: str = "slot",
+    types: Optional[Mapping[str, str]] = None,
+    legacy_janus: bool = False,
+) -> Program:
     """Parse and check a ``.rev`` file. Raises :class:`CheckError`."""
 
-def loads(source: str, *, engine: str = "slot") -> Program:
+def loads(
+    source: str,
+    *,
+    engine: str = "slot",
+    types: Optional[Mapping[str, str]] = None,
+    legacy_janus: bool = False,
+) -> Program:
     """Parse and check source text. Raises :class:`CheckError`."""
 
 def verify(

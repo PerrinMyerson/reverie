@@ -24,7 +24,7 @@ use thiserror::Error;
 pub mod embed;
 
 #[derive(Debug, Parser)]
-#[command(name = "reverie")]
+#[command(name = "reverie", version)]
 #[command(about = "A tiny reversible language you can scrub like a tape.")]
 struct Cli {
     #[command(subcommand)]
@@ -872,6 +872,13 @@ fn print_explanation(file: &Path, program: &Program, types: &[TypeArg], ml: bool
 }
 
 fn print_explanation_json(file: &Path, program: &Program, types: &[TypeArg], ml: bool) {
+    print!("{}", explanation_json(file, program, types, ml));
+}
+
+/// The `reverie explain --json` document, as text.
+fn explanation_json(file: &Path, program: &Program, types: &[TypeArg], ml: bool) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::new();
     let summary = summarize_program(program);
     let witness_report = witness_report(&summary, types);
     let features = features_with_witness(&summary, &witness_report);
@@ -933,22 +940,25 @@ fn print_explanation_json(file: &Path, program: &Program, types: &[TypeArg], ml:
         })
         .collect::<Vec<_>>();
 
-    println!("{{");
-    println!("  \"file\": {},", json_string(&file));
-    println!("  \"status\": \"reversible program checks\",");
-    println!("  \"globals\": {},", program.globals.len());
-    println!("  \"procedures\": {},", program.procedures.len());
-    println!("  \"statements\": {},", summary.statements);
-    println!("  \"expressions\": {},", summary.expressions);
-    println!(
+    let _ = writeln!(out, "{{");
+    let _ = writeln!(out, "  \"file\": {},", json_string(&file));
+    let _ = writeln!(out, "  \"status\": \"reversible program checks\",");
+    let _ = writeln!(out, "  \"globals\": {},", program.globals.len());
+    let _ = writeln!(out, "  \"procedures\": {},", program.procedures.len());
+    let _ = writeln!(out, "  \"statements\": {},", summary.statements);
+    let _ = writeln!(out, "  \"expressions\": {},", summary.expressions);
+    let _ = writeln!(
+        out,
         "  \"features\": {},",
         json_string_array(features.iter().copied())
     );
-    println!(
+    let _ = writeln!(
+        out,
         "  \"safety_checks\": {},",
         json_string_array(summary.safety_checks.iter().copied())
     );
-    println!(
+    let _ = writeln!(
+        out,
         "  \"safety_check_counts\": {},",
         json_usize_object(
             summary
@@ -957,14 +967,16 @@ fn print_explanation_json(file: &Path, program: &Program, types: &[TypeArg], ml:
                 .map(|(key, value)| (*key, *value))
         )
     );
-    println!(
+    let _ = writeln!(
+        out,
         "  \"dataset_loops\": {},",
         json_dataset_loops(&summary.dataset_loops)
     );
-    println!("  \"external_store\": [{}],", external_store.join(","));
-    println!("  \"declared_store\": [{}],", declared_store.join(","));
-    println!("  \"witness_store\": [{}],", witness_store.join(","));
-    println!(
+    let _ = writeln!(out, "  \"external_store\": [{}],", external_store.join(","));
+    let _ = writeln!(out, "  \"declared_store\": [{}],", declared_store.join(","));
+    let _ = writeln!(out, "  \"witness_store\": [{}],", witness_store.join(","));
+    let _ = writeln!(
+        out,
         "  \"witness_metrics\": {{\"variables\":{},\"known_cells\":{},\"known_payload_bytes\":{},\"unknown_variables\":{},\"entries\":[{}]}},",
         witness_report.names.len(),
         witness_report.known_cells,
@@ -973,30 +985,35 @@ fn print_explanation_json(file: &Path, program: &Program, types: &[TypeArg], ml:
         witness_entries.join(",")
     );
     if ml {
-        println!(
+        let _ = writeln!(
+            out,
             "  \"ml_profile\": {},",
             ml_profile_json(&summary, &witness_report, types)
         );
     }
-    println!(
+    let _ = writeln!(
+        out,
         "  \"run_template\": {},",
         json_string(&command_template(
             &format!("reverie run {}", shell_quote_arg(&file)),
             &run_template_args(&summary.external_names, types)
         ))
     );
-    println!(
+    let _ = writeln!(
+        out,
         "  \"declared_override_template\": {},",
         json_string(&command_template(
             &format!("reverie run {}", shell_quote_arg(&file)),
             &declared_template_args(&summary)
         ))
     );
-    println!(
+    let _ = writeln!(
+        out,
         "  \"inverse_template\": {}",
         json_string(&format!("reverie invert {}", shell_quote_arg(&file)))
     );
-    println!("}}");
+    let _ = writeln!(out, "}}");
+    out
 }
 
 fn command_template(prefix: &str, args: &str) -> String {

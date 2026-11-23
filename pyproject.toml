@@ -18,6 +18,9 @@ classifiers = [
 ]
 dynamic = ["version"]
 
+[project.scripts]
+reverie = "reverie.cli:entry_point"
+
 [project.optional-dependencies]
 test = ["pytest>=7"]
 
