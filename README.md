@@ -205,6 +205,8 @@ Two pure-Python modules build on the bindings:
   Landauer's minimum erasure heat.
 - `reverie.rollback`, `reverie.saga`, `reverie.migrate`: generated undo for
   rollback netcode, saga compensations and data down-migrations.
+- `reverie.dna`: a DNA-storage codec whose decoder is generated, and exact
+  analysis of how much event history molecular recorders preserve.
 
 See [Rewinding learning](docs/research/README.md) for the experiments and
 results.

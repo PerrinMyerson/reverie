@@ -24,6 +24,9 @@
   (generated exact data down-migrations), with
   `scripts/rollback_netcode_benchmark.py` and
   `scripts/saga_migration_study.py` and results in `docs/research/`.
+- `reverie.dna`: a rotating-code DNA storage codec with a generated decoder
+  and exact history-capacity analysis of molecular recorder architectures
+  (`scripts/dna_study.py`, `docs/research/dna.md`).
 - Faster Python store conversion (fast int/list paths, cached `Stack` type).
 - Python package: `crates/reverie-py` (PyO3, abi3 wheels for CPython 3.9+
   built with maturin) exposes `reverie.load`/`loads`, `Program.run`,

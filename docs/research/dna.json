@@ -1,0 +1,627 @@
+{
+  "schema": "reverie_dna_v1",
+  "codec": {
+    "payloads": 200,
+    "payload_bytes": 64,
+    "round_trip_exact": 200,
+    "homopolymer_free": true,
+    "bits_per_nucleotide": 1.3333333333333333,
+    "gc_mean": 0.4998697916666666,
+    "gc_min": 0.4401041666666667,
+    "gc_max": 0.5546875,
+    "substitutions": 3000,
+    "substitutions_detected": 2141,
+    "substitutions_silent": 859
+  },
+  "recorders": {
+    "recorders": [
+      "ordered tape (CRISPR array, DNA Typewriter)",
+      "tape with 3 slots",
+      "pairwise first-order domains (N^2 detectors)",
+      "per-signal counters",
+      "site flips (integrase switches)"
+    ],
+    "rows": [
+      {
+        "signals": 2,
+        "events": 1,
+        "history_bits": 1.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 2,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 2,
+          "forgotten_bits": 0.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 2,
+          "forgotten_bits": 0.0
+        },
+        "per-signal counters": {
+          "states": 2,
+          "forgotten_bits": 0.0
+        },
+        "site flips (integrase switches)": {
+          "states": 2,
+          "forgotten_bits": 0.0
+        }
+      },
+      {
+        "signals": 2,
+        "events": 2,
+        "history_bits": 2.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 4,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 4,
+          "forgotten_bits": 0.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 4,
+          "forgotten_bits": 0.0
+        },
+        "per-signal counters": {
+          "states": 3,
+          "forgotten_bits": 0.5
+        },
+        "site flips (integrase switches)": {
+          "states": 3,
+          "forgotten_bits": 0.5
+        }
+      },
+      {
+        "signals": 2,
+        "events": 3,
+        "history_bits": 3.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 8,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 8,
+          "forgotten_bits": 0.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 4,
+          "forgotten_bits": 1.188721875540867
+        },
+        "per-signal counters": {
+          "states": 4,
+          "forgotten_bits": 1.188721875540867
+        },
+        "site flips (integrase switches)": {
+          "states": 3,
+          "forgotten_bits": 1.938721875540867
+        }
+      },
+      {
+        "signals": 2,
+        "events": 4,
+        "history_bits": 4.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 16,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 8,
+          "forgotten_bits": 1.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 4,
+          "forgotten_bits": 2.4564355568004035
+        },
+        "per-signal counters": {
+          "states": 5,
+          "forgotten_bits": 1.9693609377704335
+        },
+        "site flips (integrase switches)": {
+          "states": 3,
+          "forgotten_bits": 3.3314355568004035
+        }
+      },
+      {
+        "signals": 2,
+        "events": 5,
+        "history_bits": 5.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 32,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 8,
+          "forgotten_bits": 2.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 4,
+          "forgotten_bits": 3.6627099333829864
+        },
+        "per-signal counters": {
+          "states": 6,
+          "forgotten_bits": 2.801807588956902
+        },
+        "site flips (integrase switches)": {
+          "states": 3,
+          "forgotten_bits": 4.6002099333829864
+        }
+      },
+      {
+        "signals": 2,
+        "events": 6,
+        "history_bits": 6.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 64,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 8,
+          "forgotten_bits": 3.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 4,
+          "forgotten_bits": 4.7993776756872855
+        },
+        "per-signal counters": {
+          "states": 7,
+          "forgotten_bits": 3.6666379652290106
+        },
+        "site flips (integrase switches)": {
+          "states": 3,
+          "forgotten_bits": 5.7681276756872855
+        }
+      },
+      {
+        "signals": 2,
+        "events": 7,
+        "history_bits": 7.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 128,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 8,
+          "forgotten_bits": 4.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 4,
+          "forgotten_bits": 5.883884924695231
+        },
+        "per-signal counters": {
+          "states": 8,
+          "forgotten_bits": 4.553360248841109
+        },
+        "site flips (integrase switches)": {
+          "states": 3,
+          "forgotten_bits": 6.868259924695231
+        }
+      },
+      {
+        "signals": 2,
+        "events": 8,
+        "history_bits": 8.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 256,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 8,
+          "forgotten_bits": 5.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 4,
+          "forgotten_bits": 6.9340855876567575
+        },
+        "per-signal counters": {
+          "states": 9,
+          "forgotten_bits": 5.455802492546192
+        },
+        "site flips (integrase switches)": {
+          "states": 3,
+          "forgotten_bits": 7.9262730876567575
+        }
+      },
+      {
+        "signals": 3,
+        "events": 1,
+        "history_bits": 1.584962500721156,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 3,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 3,
+          "forgotten_bits": 0.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 3,
+          "forgotten_bits": 0.0
+        },
+        "per-signal counters": {
+          "states": 3,
+          "forgotten_bits": 0.0
+        },
+        "site flips (integrase switches)": {
+          "states": 3,
+          "forgotten_bits": 0.0
+        }
+      },
+      {
+        "signals": 3,
+        "events": 2,
+        "history_bits": 3.169925001442312,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 9,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 9,
+          "forgotten_bits": 0.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 9,
+          "forgotten_bits": 0.0
+        },
+        "per-signal counters": {
+          "states": 6,
+          "forgotten_bits": 0.6666666666666666
+        },
+        "site flips (integrase switches)": {
+          "states": 6,
+          "forgotten_bits": 0.6666666666666666
+        }
+      },
+      {
+        "signals": 3,
+        "events": 3,
+        "history_bits": 4.754887502163468,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 27,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 27,
+          "forgotten_bits": 0.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 15,
+          "forgotten_bits": 1.0566416671474375
+        },
+        "per-signal counters": {
+          "states": 10,
+          "forgotten_bits": 1.6310777784188053
+        },
+        "site flips (integrase switches)": {
+          "states": 7,
+          "forgotten_bits": 2.2977444450854723
+        }
+      },
+      {
+        "signals": 3,
+        "events": 4,
+        "history_bits": 6.339850002884624,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 81,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 27,
+          "forgotten_bits": 1.584962500721156
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 15,
+          "forgotten_bits": 2.6045377376837155
+        },
+        "per-signal counters": {
+          "states": 15,
+          "forgotten_bits": 2.760345370851141
+        },
+        "site flips (integrase switches)": {
+          "states": 7,
+          "forgotten_bits": 4.271928478744971
+        }
+      },
+      {
+        "signals": 3,
+        "events": 5,
+        "history_bits": 7.924812503605781,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 243,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 27,
+          "forgotten_bits": 3.169925001442312
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 15,
+          "forgotten_bits": 4.313574411814713
+        },
+        "per-signal counters": {
+          "states": 21,
+          "forgotten_bits": 3.99139657546449
+        },
+        "site flips (integrase switches)": {
+          "states": 7,
+          "forgotten_bits": 6.279600646827773
+        }
+      },
+      {
+        "signals": 3,
+        "events": 6,
+        "history_bits": 9.509775004326936,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 729,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 27,
+          "forgotten_bits": 4.754887502163468
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 15,
+          "forgotten_bits": 6.072813697873777
+        },
+        "per-signal counters": {
+          "states": 28,
+          "forgotten_bits": 5.289934205785287
+        },
+        "site flips (integrase switches)": {
+          "states": 7,
+          "forgotten_bits": 8.242744768366814
+        }
+      },
+      {
+        "signals": 3,
+        "events": 7,
+        "history_bits": 11.094737505048093,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 2187,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 27,
+          "forgotten_bits": 6.339850002884624
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 15,
+          "forgotten_bits": 7.832340625199356
+        },
+        "per-signal counters": {
+          "states": 36,
+          "forgotten_bits": 6.635651829081532
+        },
+        "site flips (integrase switches)": {
+          "states": 7,
+          "forgotten_bits": 10.139813088071971
+        }
+      },
+      {
+        "signals": 3,
+        "events": 8,
+        "history_bits": 12.679700005769249,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 6561,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 27,
+          "forgotten_bits": 7.92481250360578
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 15,
+          "forgotten_bits": 9.571378541541309
+        },
+        "per-signal counters": {
+          "states": 45,
+          "forgotten_bits": 8.01577323464968
+        },
+        "site flips (integrase switches)": {
+          "states": 7,
+          "forgotten_bits": 11.971080211131284
+        }
+      },
+      {
+        "signals": 4,
+        "events": 1,
+        "history_bits": 2.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 4,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 4,
+          "forgotten_bits": 0.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 4,
+          "forgotten_bits": 0.0
+        },
+        "per-signal counters": {
+          "states": 4,
+          "forgotten_bits": 0.0
+        },
+        "site flips (integrase switches)": {
+          "states": 4,
+          "forgotten_bits": 0.0
+        }
+      },
+      {
+        "signals": 4,
+        "events": 2,
+        "history_bits": 4.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 16,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 16,
+          "forgotten_bits": 0.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 16,
+          "forgotten_bits": 0.0
+        },
+        "per-signal counters": {
+          "states": 10,
+          "forgotten_bits": 0.75
+        },
+        "site flips (integrase switches)": {
+          "states": 10,
+          "forgotten_bits": 0.75
+        }
+      },
+      {
+        "signals": 4,
+        "events": 3,
+        "history_bits": 6.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 64,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 64,
+          "forgotten_bits": 0.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 40,
+          "forgotten_bits": 0.8915414066556503
+        },
+        "per-signal counters": {
+          "states": 20,
+          "forgotten_bits": 1.860902344426084
+        },
+        "site flips (integrase switches)": {
+          "states": 14,
+          "forgotten_bits": 2.423402344426084
+        }
+      },
+      {
+        "signals": 4,
+        "events": 4,
+        "history_bits": 8.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 256,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 64,
+          "forgotten_bits": 2.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 64,
+          "forgotten_bits": 2.3752047404558017
+        },
+        "per-signal counters": {
+          "states": 35,
+          "forgotten_bits": 3.184891992762171
+        },
+        "site flips (integrase switches)": {
+          "states": 15,
+          "forgotten_bits": 4.58721138155406
+        }
+      },
+      {
+        "signals": 4,
+        "events": 5,
+        "history_bits": 10.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 1024,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 64,
+          "forgotten_bits": 4.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 64,
+          "forgotten_bits": 4.186344495944663
+        },
+        "per-signal counters": {
+          "states": 56,
+          "forgotten_bits": 4.647797028533011
+        },
+        "site flips (integrase switches)": {
+          "states": 15,
+          "forgotten_bits": 6.951352797317487
+        }
+      },
+      {
+        "signals": 4,
+        "events": 6,
+        "history_bits": 12.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 4096,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 64,
+          "forgotten_bits": 6.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 64,
+          "forgotten_bits": 6.167055054653419
+        },
+        "per-signal counters": {
+          "states": 84,
+          "forgotten_bits": 6.20702343636477
+        },
+        "site flips (integrase switches)": {
+          "states": 15,
+          "forgotten_bits": 9.367265138316188
+        }
+      },
+      {
+        "signals": 4,
+        "events": 7,
+        "history_bits": 14.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 16384,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 64,
+          "forgotten_bits": 8.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 64,
+          "forgotten_bits": 8.239054291166356
+        },
+        "per-signal counters": {
+          "states": 120,
+          "forgotten_bits": 7.836027183832276
+        },
+        "site flips (integrase switches)": {
+          "states": 15,
+          "forgotten_bits": 11.775642066512264
+        }
+      },
+      {
+        "signals": 4,
+        "events": 8,
+        "history_bits": 16.0,
+        "ordered tape (CRISPR array, DNA Typewriter)": {
+          "states": 65536,
+          "forgotten_bits": 0.0
+        },
+        "tape with 3 slots": {
+          "states": 64,
+          "forgotten_bits": 10.0
+        },
+        "pairwise first-order domains (N^2 detectors)": {
+          "states": 64,
+          "forgotten_bits": 10.355690093488333
+        },
+        "per-signal counters": {
+          "states": 165,
+          "forgotten_bits": 9.517313923526604
+        },
+        "site flips (integrase switches)": {
+          "states": 15,
+          "forgotten_bits": 14.149487086685351
+        }
+      }
+    ]
+  }
+}

@@ -22,13 +22,16 @@ python3 scripts/rollback_netcode_benchmark.py \
 python3 scripts/saga_migration_study.py \
   --json-output docs/research/sagas-and-migrations.json \
   --markdown-output docs/research/sagas-and-migrations.md
+python3 scripts/dna_study.py \
+  --json-output docs/research/dna.json \
+  --markdown-output docs/research/dna.md
 ```
 
 Results: [exact-unlearning-results.md](exact-unlearning-results.md),
 [reversibility-report.md](reversibility-report.md),
 [prompt-recovery.md](prompt-recovery.md),
-[rollback-netcode.md](rollback-netcode.md) and
-[sagas-and-migrations.md](sagas-and-migrations.md). Each script also has a
+[rollback-netcode.md](rollback-netcode.md),
+[sagas-and-migrations.md](sagas-and-migrations.md) and [dna.md](dna.md). Each script also has a
 `--self-test` that runs in CI.
 
 ## 1. The idea: store the errors, recompute the activations
@@ -302,6 +305,8 @@ After checking each idea against the literature, here is what holds up:
 | rollback netcode by reverse execution instead of snapshots | **Not found in games** (established in discrete-event simulation). Validated: exact, 7–33× less memory, ≈2.1× compute per rewound frame (§10) |
 | generated saga compensations, exact under concurrent writers | **No prior work found** on derived compensations with guarantees. Validated: 0 silent errors vs 12% hand-written and 56% snapshot (§10) |
 | exact generated data down-migrations with flagged conflicts | **Useful**; schema tools explicitly do not revert data. Validated: 100% exact, conflicts flagged, none silent (§10) |
+| DNA-storage codec with a generated, validating decoder | **New as a construction** (verified codecs exist in general). Validated: exact, homopolymer-free, rejects 71% of substitutions (§11) |
+| exact history capacity of molecular recorder architectures | **No exact accounting found.** Validated by enumeration; idealised models (§11) |
 | bit-exact training across platforms | Integer semantics guarantee it. A golden-fingerprint test runs on Linux, macOS and Windows CI. Float LLM pipelines need special kernels for this (batch-invariant inference; "GPU butterfly effect" in neural compression) |
 
 The most promising next step for Reverie the *language* is to make "uncompute
@@ -431,7 +436,102 @@ drops a column:
    exchange for memory, for no serialization code, and for correctness by
    construction.
 
-## 11. Next experiments worth running
+## 11. Biology and computational biology
+
+### Where reversibility already shows up (prior art, not ours)
+
+- **Bit-reversible molecular dynamics.** Levesque & Verlet (1993) stored
+  positions as integers so an MD trajectory runs backward bit for bit.
+  Successors include Hoover's higher-order integrators and JANUS for N-body
+  problems. This is the same integer trick Reverie uses, applied to physics.
+- **Reversible solvers for memory-efficient gradients.** The reversible Heun
+  method (Kidger et al. 2021) and algebraically reversible ODE solvers
+  (McCallum & Foster 2024) give exact gradients through long simulations
+  without storing the trajectory. That is directly relevant to fitting
+  systems-biology models; it is the Maclaurin idea of §8 for differential
+  equations.
+- **Recombinase logic and state machines** (Siuti et al.; Roquet et al. 2016)
+  store state by inverting and excising DNA. Inversion is a bijection on
+  sequence; excision literally throws the cut-out circle away, so the biology
+  has its own "witness".
+
+### What we tested ([dna.md](dna.md))
+
+**A DNA-storage codec with a generated decoder.**
+- **The codec.** Goldman et al. (2013) avoid homopolymers, which synthesis
+  and sequencing handle badly, with a rotating code: each base-3 digit picks
+  one of the three bases that differ from the previous one.
+  `reverie.dna.codec_source` writes that encoder once, and the checker proves
+  it loses nothing. The decoder is the encoder run backward.
+- **Results.**
+  - 200 of 200 random payloads round-trip exactly, and every strand is
+    homopolymer-free.
+  - Density is 1.33 bits/nt.
+  - Because the no-homopolymer assertion also runs backward, the generated
+    decoder rejects **71%** of random single-base substitutions instead of
+    returning wrong bytes. The other 29% decode silently wrong, so error
+    correction is still needed on top.
+- **Novelty.** Verified-by-construction compression already exists (§9); we
+  found no DNA-storage codec built this way.
+- **Language limit exposed.** The checker cannot prove that `dna[j + 1]` and
+  `dna[j]` are different cells, so the obvious encoder is rejected, and the
+  codec uses a mirror array that is uncomputed at the end. Teaching the
+  checker that constant-offset indices are distinct is a worthwhile
+  improvement.
+
+**How much of a cell's history its DNA can give back.**
+- **The question.** Molecular recorders write events into DNA:
+  - ordered tapes: CRISPR spacer arrays (Retro-Cascorder) and sequential
+    prime editing (DNA Typewriter);
+  - integrase site flips;
+  - per-signal editing counters;
+  - pairwise order domains (the N² detector design).
+
+  The field notes that integrase recorders "run out of states" and that most
+  devices lose event order, but we found no exact accounting of how much
+  history each architecture keeps.
+- **Exact answer.** Reading the history back is a reversibility question,
+  so `reverie.dna` enumerates every history of n events over k signals and
+  reports H(history | DNA): the bits the DNA cannot give back, which is
+  exactly the witness a decoder would need.
+- **In Reverie.** The ordered-tape recorder *moves* the history into DNA,
+  and the backward run reads it out. For the site-flip recorder, the history
+  has to remain a witness.
+
+| 8 events | history | ordered tape | 3-slot tape | pairwise first-order | per-signal counters | site flips |
+|---|---:|---:|---:|---:|---:|---:|
+| 2 signals | 8.0 bits | 0 | 5.0 | 6.9 | 5.5 | 7.9 |
+| 4 signals | 16.0 bits | 0 | 10.0 | 10.4 | 9.5 | 14.2 |
+
+What the full tables show:
+- **Site flips saturate.** Integrase switches forget almost everything once
+  events outnumber signals; they keep at most log₂(number of states) bits.
+- **The best non-tape design depends on the regime.** Pairwise-order domains
+  beat per-signal counters for short histories, and counters win for long
+  ones. The crossover moves later as signals increase: counters are strictly
+  better from 4 events with 2 signals (they tie at 3), from 5 with 3, and
+  from 7 with 4. A designer can pick the architecture for the expected event
+  count from exact numbers.
+- **These are upper bounds on what any decoder can recover.** The models are
+  idealised: uniform random histories, no editing noise, perfect readout.
+  Real recorders are stochastic, so the real numbers are worse.
+
+### Other directions worth exploring (not built)
+
+- **Exact anonymity audits for genomic data.** The secret-slot audit of §7
+  applies directly: enumerate the genotypes at a few loci and compute exact
+  anonymity sets for a released statistic or beacon response.
+- **Bit-identical pipelines.** A 2025 preprint reports BLAST+ results
+  differing across compilers and hardware through floating point, and
+  variant-calling concordance across pipelines can be low. Integer kernels
+  (alignment scoring is already integer) with fingerprinted replay proofs,
+  as in §3, would make results identical everywhere.
+- **Liftover between genome assemblies.** Reciprocal hg19 ↔ hg38 liftover is
+  not reversible, but keeping a witness only makes round trips exact by
+  remembering the original coordinates. That is trivial, so it is not
+  pursued.
+
+## 12. Next experiments worth running
 
 1. **Hypergradients through training.** This is the setting where the witness
    beats checkpoints. Reverse the digits run while accumulating
@@ -483,5 +583,11 @@ drops a column:
 - [Prisma: generating down migrations](https://www.prisma.io/docs/orm/prisma-migrate/workflows/generating-down-migrations); Herrmann et al., [Living in Parallel Realities (BiDEL/InVerDa)](https://arxiv.org/pdf/1608.05564)
 - Perumalla, Carothers & Fujimoto, [Efficient optimistic parallel simulations using reverse computation](https://www.osti.gov/biblio/1003413) (1999); [Backstroke](https://www.scilit.net/publications/ccc28b48a48d3900145ed8d8684a0c97); Schordan et al., [reversible C++ for ROSS](https://www.osti.gov/servlets/purl/1658686)
 - [GGPO](https://en.wikipedia.org/wiki/GGPO); [GGRS setup and determinism](https://docs.rs/crate/ggrs/latest/source/docs/setup.md); [rollback netcode explainer](https://ki.infil.net/w02-netcode-p5.html); [Dynasty Feud online implementation](https://www.moddb.com/features/online-implementation-for-dynasty-feud)
+- Levesque & Verlet, [Molecular dynamics and time reversibility](https://link.springer.com/article/10.1007/BF01048022) (1993); Hoover & Hoover, [Bit-reversible Milne integrator](https://arxiv.org/abs/1706.08678); Rein & Tamayo, [JANUS bit-wise reversible N-body integrator](https://arxiv.org/abs/1704.07715)
+- Kidger et al., [Efficient and Accurate Gradients for Neural SDEs (reversible Heun)](https://arxiv.org/abs/2105.13493) (NeurIPS 2021); McCallum & Foster, [Efficient, Accurate and Stable Gradients](https://arxiv.org/html/2410.11648v1) (2024)
+- Roquet et al., [Synthetic recombinase-based state machines in living cells](https://microsoft.com/en-us/research/?p=766975) (Science 2016); Ham et al., [Double inversion recombination switch](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2481393/) (2008)
+- Choi et al., [A time-resolved, multi-symbol molecular recorder via sequential genome editing (DNA Typewriter)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9352581/) (Nature 2022); [Retro-Cascorder](https://link.springer.com/article/10.1038/s41586-022-04994-6) (Nature 2022)
+- Goldman et al., High-capacity storage of digital information in DNA (Nature 2013), via [Survey of Information Encoding Techniques for DNA](https://arxiv.org/pdf/1906.11062); [EBI DNA storage page](https://www.ebi.ac.uk/goldman-srv/DNA-storage)
+- [Systematic Evaluation of Variant Discrepancies During Reciprocal hg19/hg38 Liftover](https://www.mdpi.com/1422-0067/27/22/10305) (2025); [Low concordance of multiple variant-calling pipelines](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3706896/) (2013)
 - Kim et al., [I-BERT: Integer-only BERT Quantization](https://arxiv.org/abs/2101.01321) (ICML 2021)
 - Yokoyama & Glück, [A Reversible Programming Language and its Invertible Self-Interpreter](https://dl.acm.org/doi/pdf/10.1145/1244381.1244404) (Janus)

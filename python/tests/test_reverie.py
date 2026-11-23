@@ -585,3 +585,41 @@ def test_migration_down_is_exact_and_flags_edited_rows():
     flagged = {r for r in range(200) if any(rolled[c][r] for c in mg.V2 + mg.WITNESS)}
     assert flagged <= edited
     assert all(rolled[c][r] == v1[c][r] for c in mg.V1 for r in range(200) if r not in edited)
+
+
+# -- DNA -----------------------------------------------------------------------
+
+
+def test_dna_codec_round_trips_and_rejects_homopolymers():
+    import os
+
+    from reverie import dna
+
+    for n in (1, 9, 40):
+        payload = os.urandom(n)
+        strand = dna.encode(payload)
+        assert len(strand) == 1 + 6 * n
+        assert all(a != b for a, b in zip(strand, strand[1:]))
+        assert dna.decode(strand) == payload
+    strand = dna.encode(b"hi")
+    with pytest.raises(reverie.ExecutionError):
+        dna.decode(strand[:3] + strand[2] + strand[4:])  # creates a homopolymer
+
+
+def test_dna_recorders():
+    from reverie import dna
+
+    tape = reverie.loads(dna.tape_recorder_source(4, 3))
+    out = tape.run(history=[2, 0, 1, 2])
+    assert out["history"] == [0, 0, 0, 0]
+    assert tape.reverse(out)["history"] == [2, 0, 1, 2]
+    flips = reverie.loads(dna.flip_recorder_source(4, 3)).run(history=[2, 0, 2, 1])
+    assert flips["site"] == [1, 1, 1] and flips["repeats"] == [0, 0, 1, 0]
+    states = dna.recorder_states(dna.RECORDERS["site flips (integrase switches)"], 3, 2)
+    h, forgotten = dna.history_entropy(states)
+    import math
+
+    # States {0}, {1} hold one history each; {0, 1} holds the other six.
+    assert h == 3 and forgotten == pytest.approx(6 * math.log2(6) / 8)
+    tape_states = dna.recorder_states(dna.RECORDERS["ordered tape (CRISPR array, DNA Typewriter)"], 4, 3)
+    assert dna.history_entropy(tape_states)[1] == 0
